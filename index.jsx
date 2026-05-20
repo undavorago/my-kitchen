@@ -1,4 +1,4 @@
-const { useState, useEffect, useMemo } = React;
+const { useState, useEffect, useMemo, useRef } = React;
 
 
 
@@ -1345,17 +1345,20 @@ function RecipeModal({recipe:r, onClose, onRate, onAddMissing, pantry, onCook, o
   const [noteText,setNoteText]=useState('');
   const scale=srv/(r.baseServ||2);
 
-  const cookResult = cooked ? r.ingredients.map(ing=>{
+  const ingredients=(r.ingredients||r.ings||[]);
+  const steps=(r.steps||[]);
+
+  const cookResult = cooked ? ingredients.map(ing=>{
     const pm=matchPantry(ing.n,pantry);
     if(!pm) return null;
     const used=ing.amt*scale;
     return {name:pm.n,was:pm.qty,now:Math.max(0,pm.qty-used),unit:pm.unit};
   }).filter(Boolean) : [];
 
-  const missing=r.ingredients.filter(i=>!matchPantry(i.n,pantry));
+  const missing=ingredients.filter(i=>!matchPantry(i.n,pantry));
 
   const handleCook=()=>{
-    onCook(r.ingredients,scale);
+    onCook(ingredients,scale);
     setCooked(true);
   };
 
@@ -1394,7 +1397,7 @@ function RecipeModal({recipe:r, onClose, onRate, onAddMissing, pantry, onCook, o
           <div className="sec">🧺 Ингредиенты</div>
           <div className="ing-legend"><span>✓ есть в полочке</span><span style={{color:'var(--tr)'}}>+ нужно купить</span></div>
           <div className="ing-list">
-            {r.ingredients.map((ing,i)=>(
+            {ingredients.map((ing,i)=>(
               <IngRow key={i} ing={ing} scale={scale} pantry={pantry}/>
             ))}
           </div>
@@ -1415,7 +1418,7 @@ function RecipeModal({recipe:r, onClose, onRate, onAddMissing, pantry, onCook, o
           
           <div className="sec">📋 Приготовление</div>
           <div className="steps">
-            {r.steps.map((s,i)=>(
+            {steps.map((s,i)=>(
               <div key={i} className="step">
                 <div className="step-num">{i+1}</div>
                 <StepTimer text={s} stepIdx={i}/>
@@ -2071,9 +2074,15 @@ function RecipesPage({recipes, onOpen, customCats, onUpdateCats, onAddRecipe}){
               <textarea className="inp" placeholder="Ингредиенты: каждый с новой строки, формат: название|кол-во" value={draft.ingsText||''} onChange={e=>setDraft({...draft,ingsText:e.target.value})}/>
               <textarea className="inp" placeholder="Шаги: каждый с новой строки" value={draft.stepsText||''} onChange={e=>setDraft({...draft,stepsText:e.target.value})}/>
               <button className="btn btn-p" onClick={()=>{
-                if(!draft.name.trim()) return;
-                onAddRecipe({...draft,id:Date.now(),rating:null,video:false,love:false,ings:(draft.ingsText||'').split('\n').filter(Boolean).map(x=>{const [n,amt]=x.split('|');return {n:n.trim(),amt:Number(amt)||1,u:'шт'};}),steps:(draft.stepsText||'').split('\n').filter(Boolean),myNotes:[]});
+                const name=draft.name.trim();
+                if(!name){
+                  setShowAdd(false);
+                  return;
+                }
+                const ingredients=(draft.ingsText||'').split('\n').filter(Boolean).map(x=>{const [n,amt]=x.split('|');return {n:(n||'').trim(),amt:Number(amt)||1,u:'шт'};}).filter(i=>i.n);
+                const steps=(draft.stepsText||'').split('\n').map(s=>s.trim()).filter(Boolean);
                 setShowAdd(false);
+                onAddRecipe({...draft,name,id:Date.now(),rating:null,video:false,love:false,time:30,baseServ:2,ingredients,steps,myNotes:[]});
               }}>сохранить рецепт</button>
             </div>
           </div>
@@ -2420,7 +2429,7 @@ function ShoppingPage({extraItems}){
           <div className="exp-legend-item"><div className="exp-dot" style={{background:'var(--sage2)'}}/> Еда</div>
           <div className="exp-legend-item"><div className="exp-dot" style={{background:'var(--blush)'}}/> Бытовое</div>
           <div style={{marginLeft:'auto',fontFamily:"'Caveat',cursive",fontSize:'.82rem',color:'var(--txt3)'}}>
-            средняя: {Math.round(EXPENSE_HISTORY.slice(0,-1).reduce((s,m)=>s+m.food+m.house,0)/5)} ₽/мес
+            средняя: {Math.round(EXPENSE_HISTORY.slice(0,-1).reduce((s,m)=>s+m.food+m.house,0)/Math.max(1,EXPENSE_HISTORY.length-1))} ₽/мес
           </div>
         </div>
       </div>
@@ -2592,6 +2601,49 @@ function App(){
   const [diaryEntries,setDiaryEntries]=usePersistentState('diaryEntries',{});
   const [channels,setChannels]=usePersistentState('channels',CHANNELS);
   const [globalQuery,setGlobalQuery]=useState('');
+  const importInputRef=useRef(null);
+
+  const exportData=()=>{
+    const payload={
+      exportedAt:new Date().toISOString(),
+      version:1,
+      data:{tab,recipes,pantry,customCats,shopExtra,wishlist,diaryEntries,channels}
+    };
+    const blob=new Blob([JSON.stringify(payload,null,2)],{type:'application/json'});
+    const url=URL.createObjectURL(blob);
+    const a=document.createElement('a');
+    const stamp=new Date().toISOString().slice(0,10);
+    a.href=url;
+    a.download=`my-kitchen-backup-${stamp}.json`;
+    document.body.appendChild(a);
+    a.click();
+    a.remove();
+    URL.revokeObjectURL(url);
+  };
+
+  const importData=async e=>{
+    const file=e.target.files&&e.target.files[0];
+    if(!file) return;
+    try{
+      const text=await file.text();
+      const parsed=JSON.parse(text);
+      const d=parsed&&parsed.data?parsed.data:parsed;
+      if(!d||typeof d!=='object') throw new Error('bad');
+      if(Array.isArray(d.recipes)) setRecipes(d.recipes);
+      if(Array.isArray(d.pantry)) setPantry(d.pantry);
+      if(Array.isArray(d.customCats)) setCustomCats(d.customCats);
+      if(Array.isArray(d.shopExtra)) setShopExtra(d.shopExtra);
+      if(Array.isArray(d.wishlist)) setWishlist(d.wishlist);
+      if(d.diaryEntries&&typeof d.diaryEntries==='object') setDiaryEntries(d.diaryEntries);
+      if(Array.isArray(d.channels)) setChannels(d.channels);
+      if(typeof d.tab==='string') setTab(d.tab);
+      alert('Импорт выполнен ✅');
+    }catch(err){
+      alert('Не удалось импортировать файл. Проверь формат JSON.');
+    }finally{
+      e.target.value='';
+    }
+  };
 
   const rate=(id,rating)=>setRecipes(p=>p.map(r=>r.id===id?{...r,rating:r.rating===rating?null:rating}:r));
 
@@ -2636,7 +2688,7 @@ function App(){
               <div className="logo-reel"/>
               <span style={{margin:'0 8px'}}>🌿 <span>моя кухня</span></span>
             </div>
-            <div style={{display:'flex',alignItems:'center',gap:8,flexWrap:'wrap'}}><input className="inp" style={{maxWidth:260}} placeholder="глобальный поиск..." value={globalQuery} onChange={e=>setGlobalQuery(e.target.value)}/>{globalQuery&&<span className="tag">{searched.length} найдено</span>}</div><nav className="nav">
+            <div style={{display:'flex',alignItems:'center',gap:8,flexWrap:'wrap'}}><input className="inp" style={{maxWidth:260}} placeholder="глобальный поиск..." value={globalQuery} onChange={e=>setGlobalQuery(e.target.value)}/>{globalQuery&&<span className="tag">{searched.length} найдено</span>}<button className="nb" onClick={exportData}>⬇️ Экспорт</button><button className="nb" onClick={()=>importInputRef.current&&importInputRef.current.click()}>⬆️ Импорт</button><input ref={importInputRef} type="file" accept="application/json" style={{display:'none'}} onChange={importData}/></div><nav className="nav">
               {TABS.map(t=>(
                 <button key={t.k} className={`nb ${tab===t.k?'on':''}`} onClick={()=>setTab(t.k)}>
                   {t.i} {t.l}
