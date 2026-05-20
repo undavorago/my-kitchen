@@ -1,5 +1,56 @@
-const { useState } = React;
+const { useState, useEffect, useMemo } = React;
 
+
+
+const DB_NAME='my-kitchen-db';
+const DB_STORE='kv';
+const STORAGE_KEY='my-kitchen-fallback-v1';
+
+function openDb(){
+  return new Promise((resolve,reject)=>{
+    const req=indexedDB.open(DB_NAME,1);
+    req.onupgradeneeded=()=>{req.result.createObjectStore(DB_STORE)};
+    req.onsuccess=()=>resolve(req.result);
+    req.onerror=()=>reject(req.error);
+  });
+}
+
+async function idbGet(key){
+  const db=await openDb();
+  return new Promise((resolve,reject)=>{
+    const tx=db.transaction(DB_STORE,'readonly');
+    const rq=tx.objectStore(DB_STORE).get(key);
+    rq.onsuccess=()=>resolve(rq.result);
+    rq.onerror=()=>reject(rq.error);
+  });
+}
+async function idbSet(key,val){
+  const db=await openDb();
+  return new Promise((resolve,reject)=>{
+    const tx=db.transaction(DB_STORE,'readwrite');
+    tx.objectStore(DB_STORE).put(val,key);
+    tx.oncomplete=()=>resolve();
+    tx.onerror=()=>reject(tx.error);
+  });
+}
+
+function usePersistentState(key, initial){
+  const [state,setState]=useState(initial);
+  const [ready,setReady]=useState(false);
+  useEffect(()=>{(async()=>{try{
+    const idb=await idbGet(key);
+    if(idb!==undefined) setState(idb);
+    else {
+      const raw=localStorage.getItem(STORAGE_KEY+':'+key);
+      if(raw) setState(JSON.parse(raw));
+    }
+  }catch(e){
+    const raw=localStorage.getItem(STORAGE_KEY+':'+key);
+    if(raw) try{setState(JSON.parse(raw));}catch{}
+  } finally {setReady(true);} })();},[key]);
+  useEffect(()=>{if(!ready) return; (async()=>{try{await idbSet(key,state);}catch{} localStorage.setItem(STORAGE_KEY+':'+key,JSON.stringify(state));})();},[key,state,ready]);
+  return [state,setState,ready];
+}
 const S = `
 @import url('https://fonts.googleapis.com/css2?family=Pinyon+Script&family=Cormorant+Garamond:ital,wght@0,300;0,400;0,500;0,600;1,300;1,400;1,600&family=Raleway:wght@300;400;500;600;700&family=Caveat:wght@400;600&display=swap');
 
@@ -1162,6 +1213,7 @@ function PantryItem({item, onEdit}){
         </div>
       </div>
       <button className="shi-edit-btn" onClick={()=>{setVal(String(item.qty));setEditing(true);}}>✏️</button>
+
     </div>
   );
 }
@@ -1514,9 +1566,9 @@ function DiaryQuickBtn({item, onAdd}){
   );
 }
 
-function DiaryPage(){
+function DiaryPage({entriesState, setEntriesState}){
   const [weekOffset,setWeekOffset]=useState(0);
-  const [entries,setEntries]=useState({});
+  const entries=entriesState||{};
   const [custom,setCustom]=useState('');
   const [customKcal,setCustomKcal]=useState('');
   const [showQuick,setShowQuick]=useState(true);
@@ -1535,10 +1587,10 @@ function DiaryPage(){
   const barColor=pct>=85&&pct<=115?'var(--sage)':pct<85?'var(--gold2)':'var(--tr2)';
 
   const addEntry=item=>{
-    setEntries(prev=>({...prev,[selectedDay]:[...(prev[selectedDay]||[]),{...item,id:Date.now()}]}));
+    setEntriesState(prev=>({...prev,[selectedDay]:[...(prev[selectedDay]||[]),{...item,id:Date.now()}]}));
   };
   const removeEntry=id=>{
-    setEntries(prev=>({...prev,[selectedDay]:(prev[selectedDay]||[]).filter(e=>e.id!==id)}));
+    setEntriesState(prev=>({...prev,[selectedDay]:(prev[selectedDay]||[]).filter(e=>e.id!==id)}));
   };
   const addCustom=()=>{
     if(!custom.trim()||!customKcal) return;
@@ -1821,7 +1873,7 @@ function CustomCatChip({cc, active, onClick}){
 
 const EMOJI_OPTIONS=['⚡','🕯️','🌱','🎉','❤️','🌙','☀️','🏠','🍰','🥗','🍲','🌶️','🧁','🫖','💪','👩‍🍳'];
 
-function RecipesPage({recipes, onOpen, customCats, onUpdateCats}){
+function RecipesPage({recipes, onOpen, customCats, onUpdateCats, onAddRecipe}){
   const [cat,setCat]=useState('Все');
   const [activeCustCat,setActiveCustCat]=useState(null);
   const [query,setQuery]=useState('');
@@ -1830,6 +1882,8 @@ function RecipesPage({recipes, onOpen, customCats, onUpdateCats}){
   const [newCatEmoji,setNewCatEmoji]=useState('⚡');
   const [newCatPi,setNewCatPi]=useState(0);
   const [assignMode,setAssignMode]=useState(null);
+  const [showAdd,setShowAdd]=useState(false);
+  const [draft,setDraft]=useState({name:'',cat:'Ужин',emoji:'🍲',kcal:300,b:20,f:10,u:20,ings:[],steps:[],notes:'',safefood:false,tags:[]});
 
   let list=recipes;
   if(activeCustCat){
@@ -2001,8 +2055,30 @@ function RecipesPage({recipes, onOpen, customCats, onUpdateCats}){
             </div>
           );
         })}
-        {!assignMode&&<button className="add-rc"><span style={{fontSize:'1.7rem'}}>＋</span><span>новый рецепт</span></button>}
+        {!assignMode&&<button className="add-rc" onClick={()=>setShowAdd(true)}><span style={{fontSize:'1.7rem'}}>＋</span><span>новый рецепт</span></button>}
       </div>
+
+      {showAdd&&(
+        <div className="overlay" onClick={()=>setShowAdd(false)}>
+          <div className="modal" onClick={e=>e.stopPropagation()}>
+            <div className="mhdr"><div className="m-title">Новый рецепт</div><button className="m-close" onClick={()=>setShowAdd(false)}>✕</button></div>
+            <div className="mbody" style={{display:'grid',gap:8}}>
+              <input className="inp" placeholder="Название" value={draft.name} onChange={e=>setDraft({...draft,name:e.target.value})}/>
+              <div style={{display:'flex',gap:8}}>
+                <input className="inp" placeholder="Эмодзи" value={draft.emoji} onChange={e=>setDraft({...draft,emoji:e.target.value})}/>
+                <input className="inp" placeholder="Категория" value={draft.cat} onChange={e=>setDraft({...draft,cat:e.target.value})}/>
+              </div>
+              <textarea className="inp" placeholder="Ингредиенты: каждый с новой строки, формат: название|кол-во" value={draft.ingsText||''} onChange={e=>setDraft({...draft,ingsText:e.target.value})}/>
+              <textarea className="inp" placeholder="Шаги: каждый с новой строки" value={draft.stepsText||''} onChange={e=>setDraft({...draft,stepsText:e.target.value})}/>
+              <button className="btn btn-p" onClick={()=>{
+                if(!draft.name.trim()) return;
+                onAddRecipe({...draft,id:Date.now(),rating:null,video:false,love:false,ings:(draft.ingsText||'').split('\n').filter(Boolean).map(x=>{const [n,amt]=x.split('|');return {n:n.trim(),amt:Number(amt)||1,u:'шт'};}),steps:(draft.stepsText||'').split('\n').filter(Boolean),myNotes:[]});
+                setShowAdd(false);
+              }}>сохранить рецепт</button>
+            </div>
+          </div>
+        </div>
+      )}
 
       {list.length===0&&(
         <div style={{textAlign:'center',padding:'40px 20px',fontFamily:"'Caveat',cursive",fontSize:'1rem',color:'var(--txt3)'}}>
@@ -2240,7 +2316,7 @@ function ShoppingPage({extraItems}){
   const [nw,setNw]=useState('');
   const [newCat,setNewCat]=useState('🥬 Овощи и фрукты');
   const [showHousehold,setShowHousehold]=useState(false);
-  useState(()=>{if(extraItems?.length){setItems(p=>{const ex=new Set(p.map(i=>i.name.toLowerCase()));const ns=extraItems.filter(e=>!ex.has(e.name.toLowerCase()));return[...p,...ns];});}},[extraItems]);
+  useEffect(()=>{if(extraItems?.length){setItems(p=>{const ex=new Set(p.map(i=>i.name.toLowerCase()));const ns=extraItems.filter(e=>!ex.has(e.name.toLowerCase()));return[...p,...ns];});}},[extraItems]);
   const budget=3000;
   const total=items.reduce((s,i)=>s+i.price,0);
   const spent=items.filter(i=>i.done).reduce((s,i)=>s+i.price,0);
@@ -2280,8 +2356,9 @@ function ShoppingPage({extraItems}){
             <div key={item.id} className="si2">
               <div className={`scb ${item.done?'ck':''}`} onClick={()=>toggle(item.id)}>{item.done&&'✓'}</div>
               <span className={`sn ${item.done?'dn':''}`}>{item.name}</span>
-              <span className="sa">{item.amount}</span>
-              <span className="sp">{item.price>0?`${item.price} ₽`:'—'}</span>
+              <input className="sa" value={item.amount} onChange={e=>setItems(p=>p.map(x=>x.id===item.id?{...x,amount:e.target.value}:x))} style={{maxWidth:80,border:'1px solid var(--brd)',borderRadius:8,padding:'2px 6px'}}/>
+              <input className="sp" value={item.price} type="number" min="0" onChange={e=>setItems(p=>p.map(x=>x.id===item.id?{...x,price:Number(e.target.value)||0}:x))} style={{maxWidth:75,border:'1px solid var(--brd)',borderRadius:8,padding:'2px 6px'}}/>
+              <button onClick={()=>remove(item.id)} style={{border:'none',background:'transparent',cursor:'pointer',color:'var(--tr)'}}>✕</button>
             </div>
           ))}
           <div className="air" style={{flexDirection:'column',gap:8}}>
@@ -2323,7 +2400,7 @@ function ShoppingPage({extraItems}){
                   onMouseOver={e=>e.currentTarget.style.background='var(--parch)'}
                   onMouseOut={e=>e.currentTarget.style.background='transparent'}>
                   <span>{item.done?'✓':'○'}</span>
-                  <span style={{textDecoration:item.done?'line-through':'none',opacity:item.done?.5:1}}>{item.name}</span>
+                  <span style={{textDecoration:item.done?'line-through':'none',opacity:item.done?0.5:1}}>{item.name}</span>
                   <span style={{marginLeft:'auto',fontFamily:"'Caveat',cursive",color:'var(--txt3)'}}>{item.amount}</span>
                 </div>
               ))}
@@ -2351,7 +2428,7 @@ function ShoppingPage({extraItems}){
   );
 }
 
-function PantryPage({pantry, onEditQty}){
+function PantryPage({pantry, onEditQty, onAddItem, onRemoveItem}){
   const cats=[...new Set(pantry.map(p=>p.cat))];
   const low=pantry.filter(p=>p.qty<=p.low&&p.qty>0);
   const empty=pantry.filter(p=>p.qty<=0);
@@ -2367,6 +2444,12 @@ function PantryPage({pantry, onEditQty}){
         <span className="tag">📦 всего {pantry.length} позиций</span>
       </div>
 
+      <div style={{display:'flex',gap:8,marginBottom:12,flexWrap:'wrap'}}>
+        <input id="pantry-name" className="inp" placeholder="новый продукт..." style={{maxWidth:220}}/>
+        <input id="pantry-cat" className="inp" placeholder="категория" style={{maxWidth:160}}/>
+        <button className="btn btn-p" onClick={()=>{const n=document.getElementById('pantry-name').value.trim();const c=document.getElementById('pantry-cat').value.trim()||'Другое'; if(!n) return; onAddItem({n,cat:c}); document.getElementById('pantry-name').value='';}}>добавить</button>
+      </div>
+
       <div className="pantry-legend">
         <span><span className="pl-dot" style={{background:'var(--sage2)'}}/> в наличии</span>
         <span><span className="pl-dot" style={{background:'#D4A843'}}/> меньше половины</span>
@@ -2375,14 +2458,23 @@ function PantryPage({pantry, onEditQty}){
       </div>
 
       {cats.map(cat=>(
-        <ShelfSection key={cat} shelf={{cat, items:pantry.filter(p=>p.cat===cat)}} onEdit={onEditQty}/>
+        <div key={cat}>
+          <div style={{display:'flex',alignItems:'center',justifyContent:'space-between',margin:'10px 0 6px'}}>
+            <span className="tag">{cat}</span>
+          </div>
+          {pantry.filter(p=>p.cat===cat).map(item=>(
+            <div key={item.id} style={{display:'flex',alignItems:'center',gap:8,marginBottom:6}}>
+              <div style={{flex:1}}><PantryItem item={item} onEdit={onEditQty}/></div>
+              <button onClick={()=>onRemoveItem(item.id)} style={{border:'none',background:'transparent',color:'var(--tr)',cursor:'pointer'}}>✕</button>
+            </div>
+          ))}
+        </div>
       ))}
     </div>
   );
 }
 
-function WishlistPage(){
-  const [wishes,setWishes]=useState(WISHES_DATA);
+function WishlistPage({wishes, setWishes}){
   const [nw,setNw]=useState('');
   const toggle=id=>setWishes(p=>p.map(w=>w.id===id?{...w,done:!w.done}:w));
   const add=()=>{if(!nw.trim())return;setWishes(p=>[...p,{id:Date.now(),n:nw,cat:'Другое',e:'🍽️',done:false}]);setNw('');};
@@ -2446,9 +2538,11 @@ function CassetteCard({ch}){
   );
 }
 
-function CassettesPage(){
+function CassettesPage({channels, onAddChannel, onRemoveChannel}){
   const [filter,setFilter]=useState('Все');
-  const list=filter==='Все'?CHANNELS:CHANNELS.filter(c=>c.type===filter);
+  const [showAdd,setShowAdd]=useState(false);
+  const [draft,setDraft]=useState({name:'',type:'YouTube',url:'',desc:'',tags:''});
+  const list=filter==='Все'?channels:channels.filter(c=>c.type===filter);
   return (
     <div>
       <div className="pt">📼 Полочка с кассетами</div>
@@ -2462,10 +2556,11 @@ function CassettesPage(){
         ))}
       </div>
       <div className="cgrid">
-        {list.map(ch=><CassetteCard key={ch.id} ch={ch}/>)}
-        <div className="add-cc"><span style={{fontSize:'2.2rem'}}>📼</span><span>добавить канал</span></div>
+        {list.map(ch=><div key={ch.id} style={{position:'relative'}}><CassetteCard ch={ch}/><button onClick={()=>onRemoveChannel(ch.id)} style={{position:'absolute',top:6,right:6,border:'1px solid var(--brd)',borderRadius:14,padding:'2px 8px',background:'var(--ww)',color:'var(--tr)',cursor:'pointer'}}>✕</button></div>)}
+        <button className="add-cc" onClick={()=>setShowAdd(true)}><span style={{fontSize:'2.2rem'}}>📼</span><span>добавить канал</span></button>
       </div>
       <div className="decor" style={{marginTop:28}}>~ нажми на кассету, чтобы открыть канал ~</div>
+      {showAdd&&(<div className="overlay" onClick={()=>setShowAdd(false)}><div className="modal" onClick={e=>e.stopPropagation()}><div className="mhdr"><div className="m-title">Новая кассета</div><button className="m-close" onClick={()=>setShowAdd(false)}>✕</button></div><div className="mbody" style={{display:'grid',gap:8}}><input className="inp" placeholder="Название" value={draft.name} onChange={e=>setDraft({...draft,name:e.target.value})}/><div style={{display:'flex',gap:8}}><select className="inp" value={draft.type} onChange={e=>setDraft({...draft,type:e.target.value})}><option>YouTube</option><option>Сайт</option><option>Блог</option></select><input className="inp" placeholder="URL" value={draft.url} onChange={e=>setDraft({...draft,url:e.target.value})}/></div><textarea className="inp" placeholder="Описание" value={draft.desc} onChange={e=>setDraft({...draft,desc:e.target.value})}/><input className="inp" placeholder="Теги через запятую" value={draft.tags} onChange={e=>setDraft({...draft,tags:e.target.value})}/><button className="btn btn-p" onClick={()=>{if(!draft.name.trim()||!draft.url.trim())return;onAddChannel({id:Date.now(),name:draft.name,type:draft.type,url:draft.url,desc:draft.desc,tags:draft.tags.split(',').map(t=>t.trim()).filter(Boolean),pi:Math.floor(Math.random()*PALETTES.length)});setShowAdd(false);}}>сохранить</button></div></div></div>)}
     </div>
   );
 }
@@ -2487,12 +2582,16 @@ const TABS=[
 ];
 
 function App(){
-  const [tab,setTab]=useState('home');
-  const [recipes,setRecipes]=useState(BASE_RECIPES);
-  const [pantry,setPantry]=useState(INIT_PANTRY);
-  const [customCats,setCustomCats]=useState(INIT_CUSTOM_CATS);
+  const [tab,setTab]=usePersistentState('tab','home');
+  const [recipes,setRecipes]=usePersistentState('recipes',BASE_RECIPES);
+  const [pantry,setPantry]=usePersistentState('pantry',INIT_PANTRY);
+  const [customCats,setCustomCats]=usePersistentState('customCats',INIT_CUSTOM_CATS);
   const [openRecipe,setOpenRecipe]=useState(null);
-  const [shopExtra,setShopExtra]=useState([]);
+  const [shopExtra,setShopExtra]=usePersistentState('shopExtra',[]);
+  const [wishlist,setWishlist]=usePersistentState('wishlist',WISHES_DATA);
+  const [diaryEntries,setDiaryEntries]=usePersistentState('diaryEntries',{});
+  const [channels,setChannels]=usePersistentState('channels',CHANNELS);
+  const [globalQuery,setGlobalQuery]=useState('');
 
   const rate=(id,rating)=>setRecipes(p=>p.map(r=>r.id===id?{...r,rating:r.rating===rating?null:rating}:r));
 
@@ -2516,11 +2615,12 @@ function App(){
     }));
   };
 
-  const editPantryQty=(id,newQty)=>{
-    setPantry(prev=>prev.map(p=>p.id===id?{...p,qty:newQty}:p));
-  };
+  const editPantryQty=(id,newQty)=>{ setPantry(prev=>prev.map(p=>p.id===id?{...p,qty:newQty}:p)); };
+  const addPantryItem=({n,cat})=>setPantry(prev=>[...prev,{id:Date.now(),n,cat,e:'📦',qty:1,max:5,low:1,unit:'шт'}]);
+  const removePantryItem=id=>setPantry(prev=>prev.filter(p=>p.id!==id));
 
   const currentRecipe=openRecipe?recipes.find(r=>r.id===openRecipe.id)||openRecipe:null;
+  const searched=useMemo(()=>{const q=globalQuery.trim().toLowerCase(); if(!q) return []; return recipes.filter(r=>r.name.toLowerCase().includes(q)||(r.tags||[]).join(' ').toLowerCase().includes(q)||(r.ings||[]).some(i=>i.n.toLowerCase().includes(q)));},[globalQuery,recipes]);
 
   return (
     <div>
@@ -2536,7 +2636,7 @@ function App(){
               <div className="logo-reel"/>
               <span style={{margin:'0 8px'}}>🌿 <span>моя кухня</span></span>
             </div>
-            <nav className="nav">
+            <div style={{display:'flex',alignItems:'center',gap:8,flexWrap:'wrap'}}><input className="inp" style={{maxWidth:260}} placeholder="глобальный поиск..." value={globalQuery} onChange={e=>setGlobalQuery(e.target.value)}/>{globalQuery&&<span className="tag">{searched.length} найдено</span>}</div><nav className="nav">
               {TABS.map(t=>(
                 <button key={t.k} className={`nb ${tab===t.k?'on':''}`} onClick={()=>setTab(t.k)}>
                   {t.i} {t.l}
@@ -2547,16 +2647,16 @@ function App(){
         </header>
         <main className="main">
           {tab==='home'      && <HomePage recipes={recipes} setTab={setTab} onOpen={r=>setOpenRecipe(r)}/>}
-          {tab==='recipes'   && <RecipesPage recipes={recipes} onOpen={r=>setOpenRecipe(r)} customCats={customCats} onUpdateCats={setCustomCats}/>}
+          {tab==='recipes'   && <RecipesPage recipes={recipes} onOpen={r=>setOpenRecipe(r)} customCats={customCats} onUpdateCats={setCustomCats} onAddRecipe={r=>setRecipes(p=>[...p,r])}/>}
           {tab==='safe'      && <SafeFoodPage recipes={recipes} onOpen={r=>setOpenRecipe(r)}/>}
           {tab==='ratings'   && <RatingsPage recipes={recipes} onOpen={r=>setOpenRecipe(r)}/>}
           {tab==='plan'      && <PlanPage/>}
           {tab==='kbju'      && <KBJUPage/>}
-          {tab==='diary'     && <DiaryPage/>}
+          {tab==='diary'     && <DiaryPage entriesState={diaryEntries} setEntriesState={setDiaryEntries}/>}
           {tab==='shopping'  && <ShoppingPage extraItems={shopExtra}/>}
-          {tab==='pantry'    && <PantryPage pantry={pantry} onEditQty={editPantryQty}/>}
-          {tab==='wishlist'  && <WishlistPage/>}
-          {tab==='cassettes' && <CassettesPage/>}
+          {tab==='pantry'    && <PantryPage pantry={pantry} onEditQty={editPantryQty} onAddItem={addPantryItem} onRemoveItem={removePantryItem}/>}
+          {tab==='wishlist'  && <WishlistPage wishes={wishlist} setWishes={setWishlist}/>}
+          {tab==='cassettes' && <CassettesPage channels={channels} onAddChannel={c=>setChannels(p=>[...p,c])} onRemoveChannel={id=>setChannels(p=>p.filter(c=>c.id!==id))}/>}
         </main>
       </div>
 
