@@ -1,111 +1,71 @@
-const { useState, useEffect, useMemo, useRef } = React;
+import { useState } from "react";
 
-
-
-const DB_NAME='my-kitchen-db';
-const DB_STORE='kv';
-const STORAGE_KEY='my-kitchen-fallback-v1';
-
-function openDb(){
-  return new Promise((resolve,reject)=>{
-    const req=indexedDB.open(DB_NAME,1);
-    req.onupgradeneeded=()=>{req.result.createObjectStore(DB_STORE)};
-    req.onsuccess=()=>resolve(req.result);
-    req.onerror=()=>reject(req.error);
-  });
-}
-
-async function idbGet(key){
-  const db=await openDb();
-  return new Promise((resolve,reject)=>{
-    const tx=db.transaction(DB_STORE,'readonly');
-    const rq=tx.objectStore(DB_STORE).get(key);
-    rq.onsuccess=()=>resolve(rq.result);
-    rq.onerror=()=>reject(rq.error);
-  });
-}
-async function idbSet(key,val){
-  const db=await openDb();
-  return new Promise((resolve,reject)=>{
-    const tx=db.transaction(DB_STORE,'readwrite');
-    tx.objectStore(DB_STORE).put(val,key);
-    tx.oncomplete=()=>resolve();
-    tx.onerror=()=>reject(tx.error);
-  });
-}
-
-function usePersistentState(key, initial){
-  const [state,setState]=useState(initial);
-  const [ready,setReady]=useState(false);
-  useEffect(()=>{(async()=>{try{
-    const idb=await idbGet(key);
-    if(idb!==undefined) setState(idb);
-    else {
-      const raw=localStorage.getItem(STORAGE_KEY+':'+key);
-      if(raw) setState(JSON.parse(raw));
-    }
-  }catch(e){
-    const raw=localStorage.getItem(STORAGE_KEY+':'+key);
-    if(raw) try{setState(JSON.parse(raw));}catch{}
-  } finally {setReady(true);} })();},[key]);
-  useEffect(()=>{if(!ready) return; (async()=>{try{await idbSet(key,state);}catch{} localStorage.setItem(STORAGE_KEY+':'+key,JSON.stringify(state));})();},[key,state,ready]);
-  return [state,setState,ready];
-}
 const S = `
-@import url('https://fonts.googleapis.com/css2?family=Pinyon+Script&family=Cormorant+Garamond:ital,wght@0,300;0,400;0,500;0,600;1,300;1,400;1,600&family=Raleway:wght@300;400;500;600;700&family=Caveat:wght@400;600&display=swap');
+@import url('https://fonts.googleapis.com/css2?family=Playfair+Display:ital,wght@0,400;0,600;0,700;1,400;1,600&family=Cormorant+Garamond:ital,wght@0,400;0,500;1,400;1,500&family=Dancing+Script:wght@400;600;700&family=Lora:ital,wght@0,400;0,500;1,400&display=swap');
 
 *{box-sizing:border-box;margin:0;padding:0;}
 
 :root{
-  --bg:#FDF6EE;
-  --bg2:#F7EDE0;
-  --parch:#F0E4D0;
-  --ww:#FFFAF4;
-  --dark:#3D2B1F;
-  --dark2:#4A3020;
-  --dark3:#5A3A28;
-  --rust:#B84030;
-  --rust2:#D45A40;
-  --rust3:#E88070;
-  --gold:#B89040;
-  --gold2:#D4AA50;
-  --gold3:#F0CC70;
-  --sage:#6A9070;
-  --sage2:#8AAE8A;
-  --sage3:#AACCAA;
-  --rose:#C89898;
-  --rose2:#E0B8B0;
-  --rose3:#F8EDED;
-  --lavender:#B8A8C8;
-  --lavender2:#D8CCE8;
-  --lavender3:#EEE8F8;
-  --txt:#2E1E12;
-  --txt2:#5A3A28;
-  --txt3:#8A6A50;
-  --brd:#DEC8A8;
-  --brd2:#C8A888;
-  --sh:rgba(62,40,20,.10);
-  --tr:#B84030;
-  --tr2:#D45A40;
-  --brn:#3D2B1F;
-  --blush:#C89898;
-  --cream:#FFFAF4;
+  --bg:#FBF5EC;
+  --bg2:#F5EDE0;
+  --parch:#EDE3D4;
+  --ww:#FFFBF5;
+  --cream:#F8F1E6;
+
+  --rose:#B86070;
+  --rose2:#CA7888;
+  --rose3:#E8B4BC;
+  --rosebg:rgba(184,96,112,.09);
+
+  --sage:#6A9478;
+  --sage2:#8AB49A;
+  --sage3:#B4D4BC;
+  --sagebg:rgba(106,148,120,.1);
+
+  --lavender:#9494BE;
+  --lav2:#B4B4D8;
+  --lavbg:rgba(148,148,190,.08);
+
+  --brown:#4A2E1E;
+  --brown2:#6A4830;
+  --brown3:#9A7860;
+
+  --txt:#3C2416;
+  --txt2:#5A3828;
+  --txt3:#8A6050;
+
+  --brd:#D8C4B0;
+  --brd2:#C4B09C;
+
+  --gold:#C4A040;
+  --gold2:#D4B050;
+  --gold3:#E8CC80;
+
+  --rust:#B86070;
+  --rust2:#CA7888;
+  --tr:#B86070;
+  --tr2:#E8B4BC;
+
+  --brn:#4A2E1E;
+
+  --shadow:rgba(74,46,30,.1);
+  --shadow2:rgba(74,46,30,.2);
+  --sh:rgba(74,46,30,.1);
 }
 
 body{
   background:var(--bg);
-  font-family:'Cormorant Garamond',serif;
+  font-family:'Lora',serif;
   color:var(--txt);
   min-height:100vh;
 }
 
 .app{
   min-height:100vh;
-  position:relative;
   background:var(--bg);
   background-image:
-    radial-gradient(ellipse at 15% 10%,rgba(212,170,80,.04) 0%,transparent 55%),
-    radial-gradient(ellipse at 85% 90%,rgba(184,168,200,.04) 0%,transparent 55%);
+    radial-gradient(ellipse at 15% 10%,rgba(184,96,112,.06) 0%,transparent 55%),
+    radial-gradient(ellipse at 85% 90%,rgba(106,148,120,.04) 0%,transparent 55%);
 }
 
 /* ── HEADER ── */
@@ -114,90 +74,87 @@ body{
   border-bottom:1.5px solid var(--brd);
   padding:0 22px;
   position:sticky;top:0;z-index:200;
-  box-shadow:0 2px 18px rgba(62,40,20,.08);
+  box-shadow:0 2px 18px rgba(74,46,30,.08);
+  position:sticky;
 }
 .hdr::after{
   content:'';
-  display:block;
   position:absolute;
-  bottom:-14px;left:0;right:0;height:14px;
-  background-image:url("data:image/svg+xml,%3Csvg%20xmlns%3D%22http%3A%2F%2Fwww.w3.org%2F2000%2Fsvg%22%20width%3D%2228%22%20height%3D%2214%22%3E%3Cpath%20d%3D%22M0%200%20Q7%2014%2014%200%20Q21%2014%2028%200%22%20fill%3D%22%23FFFAF4%22%20stroke%3D%22%23DEC8A8%22%20stroke-width%3D%221.2%22%2F%3E%3C%2Fsvg%3E");
-  background-repeat:repeat-x;
-  background-size:28px 14px;
-  pointer-events:none;
-  z-index:201;
+  bottom:-9px;left:0;right:0;
+  height:9px;
+  background:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='18' height='9'%3E%3Cpath d='M0,0 Q4.5,9 9,0 Q13.5,9 18,0' fill='none' stroke='%23D8C4B0' stroke-width='1.5'/%3E%3C/svg%3E") repeat-x;
+  z-index:201;pointer-events:none;
 }
 .hdr-in{
   max-width:1240px;margin:0 auto;
   display:flex;align-items:center;justify-content:space-between;
-  padding:10px 0;gap:14px;flex-wrap:wrap;
+  padding:14px 0;gap:14px;flex-wrap:wrap;
 }
 
 .logo{
-  font-family:'Pinyon Script',cursive;
-  font-size:2.3rem;color:var(--rust);
-  display:flex;align-items:center;gap:10px;
+  font-family:'Dancing Script',cursive;
+  font-size:1.9rem;color:var(--rose);
+  display:flex;align-items:center;gap:8px;
   letter-spacing:.02em;
 }
 .logo span{
-  font-family:'Raleway',sans-serif;
-  font-weight:300;font-style:normal;
-  font-size:.68rem;color:var(--txt3);
-  letter-spacing:.2em;text-transform:uppercase;
+  font-family:'Lora',serif;
+  font-style:italic;font-weight:400;
+  color:var(--brown3);font-size:.82rem;
+  letter-spacing:.1em;
 }
-.logo-reel{
-  width:14px;height:14px;border-radius:50%;
-  border:1.5px solid var(--brd2);
-  display:flex;align-items:center;justify-content:center;
-  flex-shrink:0;
-}
-.logo-reel::before{content:'';width:5px;height:5px;border-radius:50%;background:var(--brd2);}
-.logo-tape{font-size:.5rem;color:var(--brd);letter-spacing:.1em;margin:0 2px;}
+.logo-reel{display:none;}
+.logo-tape{display:none;}
 
 .nav{display:flex;gap:5px;flex-wrap:wrap;}
 .nb{
-  background:transparent;
+  background:var(--cream);
   border:1.5px solid var(--brd);
-  border-radius:20px;padding:5px 12px;
-  font-family:'Raleway',sans-serif;
-  font-size:.66rem;font-weight:500;
-  color:var(--txt2);cursor:pointer;
+  border-radius:20px;
+  padding:5px 14px;
+  font-family:'Lora',serif;
+  font-size:.78rem;
+  color:var(--txt2);
+  cursor:pointer;
   transition:all .2s;
-  display:flex;align-items:center;gap:4px;
-  white-space:nowrap;letter-spacing:.05em;text-transform:uppercase;
+  display:flex;align-items:center;gap:5px;
+  white-space:nowrap;
+  position:relative;
 }
 .nb::before{display:none;}
-.nb:hover{background:var(--rose3);border-color:var(--rose2);color:var(--rust);}
+.nb:hover{
+  background:var(--rosebg);
+  border-color:var(--rose3);
+  color:var(--rose);
+}
 .nb.on{
-  background:var(--rose3);border-color:var(--rose2);color:var(--rust);
-  box-shadow:0 2px 8px rgba(184,64,48,.1);
+  background:var(--rose);
+  border-color:var(--rose);
+  color:white;
+  box-shadow:0 2px 8px rgba(184,96,112,.3);
 }
 
 /* ── MAIN ── */
-.main{max-width:1240px;margin:0 auto;padding:38px 20px 70px;}
+.main{max-width:1240px;margin:0 auto;padding:36px 20px 70px;}
 
 /* ── TYPOGRAPHY ── */
 .pt{
-  font-family:'Pinyon Script',cursive;
-  font-size:3.2rem;color:var(--rust);
-  margin-bottom:3px;
+  font-family:'Playfair Display',serif;
+  font-size:2.2rem;color:var(--brown);
+  margin-bottom:6px;
+  letter-spacing:-.01em;
+  font-weight:700;
 }
-.pt::after{
-  content:'✦';font-size:.72rem;
-  font-family:'Cormorant Garamond',serif;
-  color:var(--gold2);
-  margin-left:10px;vertical-align:middle;opacity:.65;
-}
+.pt::after{display:none;}
 .ps{
-  font-family:'Cormorant Garamond',serif;
-  font-size:1.1rem;color:var(--txt3);
-  margin-bottom:22px;font-style:italic;
+  font-family:'Lora',serif;
+  font-size:1rem;color:var(--txt3);
+  margin-bottom:24px;
+  font-style:italic;
 }
 .sec{
-  font-family:'Raleway',sans-serif;
-  font-size:.76rem;font-weight:600;
-  letter-spacing:.1em;text-transform:uppercase;
-  color:var(--txt2);
+  font-family:'Playfair Display',serif;
+  font-size:1.15rem;color:var(--brown);
   margin-bottom:12px;
   display:flex;align-items:center;gap:8px;
 }
@@ -205,464 +162,508 @@ body{
   display:flex;align-items:center;gap:10px;
   margin-bottom:28px;
 }
-.div::before{content:'❧';font-size:1.1rem;color:var(--rose2);}
-.div::after{content:'─── ✦ ─── ✦ ───';font-size:.62rem;color:var(--brd);letter-spacing:3px;}
+.div::before{content:'✿';font-size:.9rem;color:var(--rose3);}
+.div::after{content:'· · · · · · · · · · · ·';font-size:.7rem;color:var(--brd);letter-spacing:4px;flex:1;}
 
 .tag{
   display:inline-flex;align-items:center;
-  background:var(--rose3);border:1px solid var(--rose2);
-  border-radius:20px;padding:2px 12px;
-  font-size:.68rem;font-family:'Raleway',sans-serif;font-weight:500;
-  color:var(--rust);letter-spacing:.04em;
+  background:var(--rosebg);
+  border:1px solid var(--rose3);
+  border-radius:20px;
+  padding:2px 12px;
+  font-size:.75rem;
+  font-family:'Lora',serif;
+  color:var(--txt2);
+  font-style:italic;
 }
 
 .btn{border:none;border-radius:20px;padding:8px 20px;
-  font-family:'Raleway',sans-serif;font-size:.8rem;font-weight:500;
-  cursor:pointer;transition:all .2s;letter-spacing:.05em;text-transform:uppercase;}
+  font-family:'Lora',serif;font-size:.9rem;
+  cursor:pointer;transition:all .15s;}
 .btn-p{
-  background:var(--rust);color:#FFF5F0;
-  border:1.5px solid var(--rust2);
-  box-shadow:0 2px 8px rgba(184,64,48,.2);
+  background:var(--rose);color:white;
+  box-shadow:0 2px 8px rgba(184,96,112,.3);
 }
-.btn-p:hover{background:var(--rust2);box-shadow:0 4px 14px rgba(184,64,48,.28);}
+.btn-p:hover{background:var(--rose2);transform:translateY(-1px);box-shadow:0 4px 12px rgba(184,96,112,.4);}
 
 .inp{
   flex:1;border:1.5px solid var(--brd);
   border-radius:20px;padding:8px 16px;
-  font-family:'Cormorant Garamond',serif;font-size:1rem;
-  background:var(--ww);color:var(--txt);outline:none;transition:border-color .2s;
+  font-family:'Lora',serif;font-size:.9rem;
+  background:var(--ww);color:var(--txt);outline:none;
+  transition:border-color .2s;
 }
 .inp:focus{border-color:var(--rose2);}
 
 .decor{
-  font-family:'Caveat',cursive;font-size:.9rem;
+  font-family:'Dancing Script',cursive;font-size:1.05rem;
   color:var(--txt3);text-align:center;
-  opacity:.65;padding:8px;letter-spacing:.03em;
+  opacity:.7;padding:8px;
 }
 
 /* ── STAT CARDS ── */
 .stats{display:grid;grid-template-columns:repeat(5,1fr);gap:10px;margin-bottom:24px;}
 @media(max-width:700px){.stats{grid-template-columns:1fr 1fr 1fr;}}
 .sc{
-  background:var(--ww);border:1.5px solid var(--brd);
-  border-radius:18px;padding:16px 14px;text-align:center;
-  box-shadow:0 2px 12px var(--sh);
-  cursor:pointer;transition:all .2s;
+  background:var(--ww);
+  border:1.5px solid var(--brd);
+  border-radius:14px;
+  padding:14px;text-align:center;
+  box-shadow:0 2px 10px var(--shadow);
+  cursor:pointer;transition:all .18s;
   position:relative;overflow:hidden;
 }
 .sc::before{
   content:'';position:absolute;
   top:0;left:0;right:0;height:3px;
-  background:linear-gradient(90deg,var(--rose2),var(--lavender2),var(--rose2));
+  background:linear-gradient(90deg,var(--rose3),var(--rose),var(--rose3));
 }
-.sc:hover{transform:translateY(-3px);box-shadow:0 6px 20px var(--sh);}
+.sc:hover{transform:translateY(-3px);box-shadow:0 6px 18px var(--shadow2);}
 .si{font-size:1.5rem;margin-bottom:5px;}
-.sv{font-family:'Cormorant Garamond',serif;font-size:1.5rem;font-weight:600;color:var(--dark);}
-.sl{font-size:.64rem;color:var(--txt3);margin-top:2px;font-family:'Raleway',sans-serif;font-weight:500;letter-spacing:.06em;text-transform:uppercase;}
-.sc-hint{font-family:'Caveat',cursive;font-size:.7rem;color:var(--rose);margin-top:4px;opacity:0;transition:opacity .2s;}
+.sv{font-family:'Playfair Display',serif;font-size:1.4rem;font-weight:700;color:var(--brown);}
+.sl{font-size:.72rem;color:var(--txt3);margin-top:2px;font-family:'Lora',serif;font-style:italic;}
+.sc-hint{font-family:'Dancing Script',cursive;font-size:.9rem;color:var(--rose);margin-top:4px;opacity:0;transition:opacity .2s;}
 .sc:hover .sc-hint{opacity:1;}
 
 /* ── TODAY MEALS ── */
 .tmg{display:grid;grid-template-columns:repeat(3,1fr);gap:12px;margin-bottom:26px;}
 @media(max-width:600px){.tmg{grid-template-columns:1fr;}}
 .ms{
-  background:var(--ww);border:1.5px solid var(--brd);
-  border-radius:16px;padding:16px;
-  box-shadow:0 2px 10px var(--sh);
+  background:var(--ww);
+  border:1.5px solid var(--brd);
+  border-radius:14px;padding:16px;
+  box-shadow:0 2px 8px var(--shadow);
 }
-.ml{font-family:'Raleway',sans-serif;font-size:.65rem;font-weight:600;color:var(--txt3);margin-bottom:6px;text-transform:uppercase;letter-spacing:.12em;}
-.mn{font-family:'Cormorant Garamond',serif;font-size:1.05rem;color:var(--dark);font-style:italic;}
-.mk{font-size:.82rem;color:var(--txt3);margin-top:3px;}
-.ms.empty .mn{color:var(--brd2);font-style:normal;font-size:.88rem;}
+.ml{
+  font-family:'Lora',serif;font-size:.78rem;
+  color:var(--txt3);margin-bottom:6px;
+  font-style:italic;letter-spacing:.04em;
+}
+.mn{font-family:'Playfair Display',serif;font-size:1rem;color:var(--brown);font-style:italic;}
+.mk{font-size:.8rem;color:var(--txt3);margin-top:3px;}
+.ms.empty .mn{color:var(--brd);font-style:normal;font-size:.85rem;}
 
 /* ── CAT TABS ── */
 .ctabs{display:flex;gap:7px;flex-wrap:wrap;margin-bottom:20px;}
 .ct{
   background:var(--ww);border:1.5px solid var(--brd);
   border-radius:20px;padding:5px 16px;
-  font-family:'Raleway',sans-serif;font-size:.67rem;font-weight:500;
+  font-family:'Lora',serif;font-size:.78rem;
   color:var(--txt2);cursor:pointer;transition:all .2s;
   display:flex;align-items:center;gap:5px;
-  letter-spacing:.05em;text-transform:uppercase;
+  font-style:italic;
+  box-shadow:0 1px 4px var(--shadow);
 }
-.ct:hover{border-color:var(--rose2);color:var(--rust);}
-.ct.on{background:var(--rose3);border-color:var(--rose2);color:var(--rust);box-shadow:0 2px 8px rgba(184,64,48,.1);}
+.ct:hover{border-color:var(--rose3);color:var(--rose);}
+.ct.on{
+  background:var(--rose);border-color:var(--rose);color:white;
+  box-shadow:0 2px 8px rgba(184,96,112,.3);
+}
 
 /* ── RECIPE GRID ── */
 .rgrid{display:grid;grid-template-columns:repeat(4,1fr);gap:16px;}
 @media(max-width:900px){.rgrid{grid-template-columns:1fr 1fr 1fr;}}
 @media(max-width:580px){.rgrid{grid-template-columns:1fr 1fr;}}
+
 .rc{
-  background:var(--ww);border:1.5px solid var(--brd);border-radius:18px;
-  box-shadow:0 3px 14px var(--sh);cursor:pointer;transition:transform .2s,box-shadow .2s;
+  background:var(--ww);
+  border:1.5px solid var(--brd);
+  border-radius:16px;
+  box-shadow:0 2px 10px var(--shadow);
+  cursor:pointer;transition:transform .2s,box-shadow .2s;
   position:relative;overflow:hidden;
 }
-.rc::before{content:'';position:absolute;inset:0;border-radius:inherit;pointer-events:none;z-index:1;}
-.rc:hover{transform:translateY(-4px);box-shadow:0 8px 24px rgba(62,40,20,.12);}
+.rc::before{display:none;}
+.rc:hover{transform:translateY(-4px);box-shadow:0 8px 24px var(--shadow2);}
+
 .rc-img{
   width:100%;height:130px;
-  background:linear-gradient(135deg,var(--parch),var(--rose3));
+  background:linear-gradient(135deg,#F8EAE0,#EDD5C8);
   display:flex;align-items:center;justify-content:center;
   font-size:2.6rem;position:relative;
-  border-bottom:1.5px solid var(--brd);
+  border-bottom:1px solid var(--brd);
 }
-.rc-img::after{content:'';position:absolute;inset:0;background:linear-gradient(to bottom,transparent 50%,rgba(62,40,20,.07));pointer-events:none;}
+.rc-img::after{
+  content:'';position:absolute;inset:0;
+  background:linear-gradient(to bottom,transparent 50%,rgba(74,46,30,.12));
+  pointer-events:none;
+}
 .rc-cat{
   position:absolute;top:8px;right:8px;
-  background:rgba(255,250,244,.92);color:var(--txt2);
-  font-size:.6rem;padding:2px 9px;border-radius:20px;
-  font-family:'Raleway',sans-serif;font-weight:500;letter-spacing:.05em;
-  border:1px solid var(--brd);
+  background:rgba(255,251,245,.92);color:var(--rose);
+  font-size:.62rem;padding:2px 10px;border-radius:12px;
+  font-family:'Lora',serif;font-style:italic;
+  border:1px solid var(--rose3);
 }
 .rc-vid{
   position:absolute;bottom:8px;right:8px;
-  background:rgba(184,64,48,.88);color:#FFF5F0;
-  font-size:.6rem;padding:2px 8px;border-radius:20px;
-  font-family:'Raleway',sans-serif;letter-spacing:.04em;
+  background:rgba(74,46,30,.72);color:white;
+  font-size:.62rem;padding:2px 8px;border-radius:10px;
+  font-family:'Lora',serif;
 }
 .rc-love{
-  position:absolute;top:8px;left:8px;
-  background:rgba(255,250,244,.9);border-radius:50%;
+  position:absolute;top:8px;left:8px;font-size:.9rem;
+  background:rgba(255,251,245,.88);border-radius:50%;
   width:24px;height:24px;display:flex;align-items:center;justify-content:center;
-  border:1px solid var(--brd);font-size:.9rem;
+  border:1px solid var(--brd);
 }
 .rc-safe{
   position:absolute;bottom:8px;left:8px;
-  background:rgba(106,144,112,.88);color:#E8F5E8;
-  font-size:.58rem;padding:2px 7px;border-radius:20px;
-  font-family:'Raleway',sans-serif;letter-spacing:.04em;
+  background:rgba(106,148,120,.85);color:white;
+  font-size:.6rem;padding:2px 8px;border-radius:10px;
+  font-family:'Lora',serif;font-style:italic;
 }
-.rc-body{padding:12px 14px 15px;}
+.rc-body{padding:12px 14px 14px;}
 .rc-name{
-  font-family:'Cormorant Garamond',serif;
-  font-size:1.05rem;color:var(--dark);
-  margin-bottom:6px;font-style:italic;font-weight:500;
+  font-family:'Playfair Display',serif;
+  font-size:1rem;color:var(--brown);
+  margin-bottom:6px;font-style:italic;font-weight:600;
 }
 .kbju{display:flex;gap:4px;flex-wrap:wrap;}
-.kc{border-radius:20px;padding:2px 8px;font-size:.62rem;font-family:'Raleway',sans-serif;font-weight:500;letter-spacing:.02em;}
-.kc.kal{background:rgba(184,64,48,.08);color:var(--rust);}
-.kc.bel{background:rgba(106,144,112,.1);color:var(--sage);}
-.kc.jir{background:rgba(184,144,64,.1);color:var(--gold);}
-.kc.ugl{background:rgba(184,168,200,.2);color:#7A6890;}
-.rc-rat{display:flex;align-items:center;gap:4px;margin-top:7px;font-size:.78rem;font-family:'Caveat',cursive;}
+.kc{border-radius:10px;padding:2px 8px;font-size:.64rem;font-family:'Lora',serif;font-style:italic;}
+.kc.kal{background:rgba(184,96,112,.1);color:var(--rose);}
+.kc.bel{background:rgba(106,148,120,.1);color:var(--sage);}
+.kc.jir{background:rgba(196,160,64,.1);color:var(--gold);}
+.kc.ugl{background:rgba(148,148,190,.1);color:var(--lavender);}
+.rc-rat{display:flex;align-items:center;gap:4px;margin-top:7px;font-size:.75rem;font-family:'Dancing Script',cursive;}
 .add-rc{
-  border:2px dashed var(--brd);background:transparent;border-radius:18px;
+  border:2px dashed var(--brd);background:transparent;border-radius:16px;
   display:flex;flex-direction:column;align-items:center;justify-content:center;
   gap:8px;cursor:pointer;padding:20px;min-height:200px;
   transition:all .2s;color:var(--txt3);
-  font-family:'Caveat',cursive;font-size:.95rem;
+  font-family:'Dancing Script',cursive;font-size:1.1rem;
 }
-.add-rc:hover{border-color:var(--rose2);color:var(--rust);background:rgba(212,160,160,.04);}
+.add-rc:hover{border-color:var(--rose3);color:var(--rose);background:var(--rosebg);}
 
 /* ── MODAL ── */
 .overlay{
   position:fixed;inset:0;
-  background:rgba(30,15,8,.55);z-index:500;
+  background:rgba(74,46,30,.45);z-index:500;
   display:flex;align-items:center;justify-content:center;padding:16px;
-  backdrop-filter:blur(8px);animation:fadeIn .2s ease;
+  backdrop-filter:blur(6px);animation:fadeIn .2s ease;
 }
 @keyframes fadeIn{from{opacity:0}to{opacity:1}}
 .modal{
-  background:var(--ww);border-radius:22px;
+  background:var(--ww);border-radius:20px;
   border:1.5px solid var(--brd);
   max-width:740px;width:100%;max-height:90vh;
   overflow-y:auto;
-  box-shadow:0 20px 60px rgba(30,15,8,.2),0 0 0 6px rgba(222,200,168,.15);
+  box-shadow:0 20px 60px rgba(74,46,30,.25);
   animation:slideUp .25s ease;
 }
 @keyframes slideUp{from{transform:translateY(20px);opacity:0}to{transform:translateY(0);opacity:1}}
 .modal::-webkit-scrollbar{width:5px;}
-.modal::-webkit-scrollbar-thumb{background:var(--brd);border-radius:3px;}
+.modal::-webkit-scrollbar-thumb{background:var(--brd);border-radius:10px;}
 .mhdr{
-  position:sticky;top:0;background:var(--ww);
+  position:sticky;top:0;
+  background:linear-gradient(135deg,#FFF0F2,#FBF3E8);
   border-bottom:1.5px solid var(--brd);
-  padding:16px 20px;display:flex;align-items:center;gap:12px;z-index:10;
-  border-radius:22px 22px 0 0;
+  padding:16px 22px;display:flex;align-items:center;gap:12px;z-index:10;
+  border-radius:20px 20px 0 0;
 }
 .m-emoji{font-size:2.2rem;}
 .m-title{
-  font-family:'Pinyon Script',cursive;font-size:1.9rem;
-  color:var(--rust);flex:1;
+  font-family:'Playfair Display',serif;font-size:1.3rem;
+  color:var(--brown);font-style:italic;flex:1;
 }
 .m-close{
-  background:var(--parch);border:1.5px solid var(--brd);
+  background:var(--cream);border:1.5px solid var(--brd);
   border-radius:50%;width:32px;height:32px;cursor:pointer;
-  font-size:1rem;display:flex;align-items:center;justify-content:center;
-  transition:all .15s;flex-shrink:0;color:var(--txt2);
+  font-size:.9rem;display:flex;align-items:center;justify-content:center;
+  transition:all .15s;flex-shrink:0;color:var(--txt3);
 }
-.m-close:hover{background:var(--rose3);border-color:var(--rose2);color:var(--rust);}
-.mbody{padding:20px;}
+.m-close:hover{background:var(--rosebg);border-color:var(--rose3);color:var(--rose);}
+.mbody{padding:22px;}
 
+/* serving */
 .srv-wrap{
-  background:var(--parch);border-radius:14px;padding:14px 16px;margin-bottom:20px;
+  background:var(--cream);border-radius:14px;padding:14px 16px;margin-bottom:20px;
   display:flex;align-items:center;gap:14px;flex-wrap:wrap;
   border:1.5px solid var(--brd);
 }
-.srv-label{font-family:'Raleway',sans-serif;font-size:.74rem;font-weight:600;color:var(--txt2);letter-spacing:.06em;text-transform:uppercase;}
+.srv-label{font-family:'Lora',serif;font-size:.85rem;color:var(--txt2);font-style:italic;}
 .srv-btns{display:flex;gap:6px;}
 .srv-btn{
   background:var(--ww);border:1.5px solid var(--brd);border-radius:20px;
-  padding:5px 13px;font-family:'Raleway',sans-serif;font-size:.74rem;font-weight:500;
+  padding:4px 14px;font-family:'Lora',serif;font-size:.82rem;
   color:var(--txt2);cursor:pointer;transition:all .15s;
 }
-.srv-btn:hover{border-color:var(--rose2);color:var(--rust);}
-.srv-btn.on{background:var(--rose3);border-color:var(--rose2);color:var(--rust);}
+.srv-btn:hover{border-color:var(--rose3);color:var(--rose);}
+.srv-btn.on{background:var(--rose);border-color:var(--rose);color:white;}
 .srv-kbju{display:flex;gap:6px;flex-wrap:wrap;}
 
+/* ingredients */
 .ing-list{display:flex;flex-direction:column;gap:6px;margin-bottom:14px;}
 .ing-row{
   display:flex;align-items:center;gap:10px;
-  padding:8px 14px;background:var(--bg);
-  border-radius:12px;border-left:3px solid var(--brd);
+  padding:8px 14px;background:var(--cream);
+  border-radius:10px;border-left:3px solid var(--brd);
 }
 .ing-st{width:22px;height:22px;border-radius:50%;display:flex;align-items:center;justify-content:center;font-size:.75rem;flex-shrink:0;}
-.ing-st.have{background:rgba(106,144,112,.15);color:var(--sage);}
-.ing-st.need{background:rgba(184,64,48,.1);color:var(--rust);}
-.ing-name{flex:1;font-size:.92rem;color:var(--txt);font-family:'Cormorant Garamond',serif;}
-.ing-amount{font-family:'Raleway',sans-serif;font-size:.76rem;color:var(--txt2);font-weight:500;}
-.ing-legend{display:flex;gap:12px;margin-bottom:10px;font-family:'Caveat',cursive;font-size:.84rem;color:var(--txt3);}
+.ing-st.have{background:rgba(106,148,120,.2);color:var(--sage);}
+.ing-st.need{background:rgba(184,96,112,.12);color:var(--rose);}
+.ing-name{flex:1;font-size:.9rem;color:var(--txt);font-family:'Lora',serif;}
+.ing-amount{font-family:'Lora',serif;font-size:.8rem;color:var(--txt2);font-style:italic;}
+.ing-legend{display:flex;gap:12px;margin-bottom:10px;font-family:'Dancing Script',cursive;font-size:.95rem;color:var(--txt3);}
+
 .add-miss{
   display:flex;align-items:center;gap:8px;margin-bottom:20px;
-  background:rgba(184,64,48,.04);border:1.5px dashed rgba(184,64,48,.3);
+  background:var(--rosebg);border:1.5px dashed var(--rose3);
   border-radius:12px;padding:11px 14px;cursor:pointer;transition:background .15s;
 }
-.add-miss:hover{background:rgba(184,64,48,.08);}
+.add-miss:hover{background:rgba(184,96,112,.16);}
 
+/* steps */
 .steps{display:flex;flex-direction:column;gap:10px;margin-bottom:20px;}
 .step{display:flex;gap:12px;align-items:flex-start;}
 .step-num{
   width:28px;height:28px;border-radius:50%;
-  background:var(--rose3);border:2px solid var(--rose2);color:var(--rust);
+  background:var(--rose);border:2px solid var(--rose3);
+  color:white;
   display:flex;align-items:center;justify-content:center;
-  font-family:'Raleway',sans-serif;font-size:.8rem;font-weight:600;flex-shrink:0;margin-top:1px;
+  font-family:'Playfair Display',serif;font-size:.85rem;flex-shrink:0;margin-top:1px;
 }
-.step-txt{font-size:1rem;line-height:1.65;color:var(--txt);padding-top:4px;font-family:'Cormorant Garamond',serif;}
+.step-txt{font-size:.95rem;line-height:1.65;color:var(--txt);padding-top:4px;font-family:'Lora',serif;}
 .mnotes{
-  background:rgba(106,144,112,.06);border-left:3px solid var(--sage2);border-radius:0 12px 12px 0;
-  padding:12px 14px;font-size:.98rem;line-height:1.6;
+  background:var(--sagebg);
+  border-left:3px solid var(--sage2);border-radius:0 10px 10px 0;
+  padding:12px 14px;font-size:.95rem;line-height:1.6;
   color:var(--txt2);font-style:italic;margin-bottom:16px;
-  font-family:'Cormorant Garamond',serif;
+  font-family:'Lora',serif;
 }
 
+/* cook button */
 .cook-btn{
-  width:100%;background:linear-gradient(135deg,var(--sage),#4A7050);
-  color:#E8F5E8;border:none;border-radius:20px;padding:14px;
-  font-family:'Cormorant Garamond',serif;font-size:1.1rem;font-style:italic;
+  width:100%;
+  background:linear-gradient(135deg,var(--sage),#5A8468);
+  color:white;border:none;border-radius:20px;padding:14px;
+  font-family:'Playfair Display',serif;font-size:1.05rem;font-style:italic;
   cursor:pointer;transition:all .2s;
   display:flex;align-items:center;justify-content:center;gap:10px;
-  margin-bottom:14px;box-shadow:0 4px 14px rgba(106,144,112,.25);
+  margin-bottom:14px;
+  box-shadow:0 4px 12px rgba(106,148,120,.3);
 }
-.cook-btn:hover{transform:translateY(-2px);box-shadow:0 6px 20px rgba(106,144,112,.35);}
+.cook-btn:hover{transform:translateY(-2px);box-shadow:0 6px 18px rgba(106,148,120,.4);}
 .cook-success{
-  background:rgba(106,144,112,.08);border:1.5px solid var(--sage2);
-  border-radius:12px;padding:13px;text-align:center;
-  font-family:'Caveat',cursive;font-size:.98rem;color:var(--sage);margin-bottom:14px;
+  background:var(--sagebg);border:1.5px solid var(--sage2);
+  border-radius:14px;padding:13px;text-align:center;
+  font-family:'Dancing Script',cursive;font-size:1.05rem;color:var(--sage);margin-bottom:14px;
 }
 
+/* step timer */
 .step-timer-btn{
-  background:rgba(184,64,48,.08);border:1px solid rgba(184,64,48,.28);
-  color:var(--rust);border-radius:20px;padding:2px 10px;
-  font-family:'Raleway',sans-serif;font-size:.68rem;font-weight:500;
-  cursor:pointer;transition:all .15s;margin-left:8px;white-space:nowrap;letter-spacing:.04em;
+  background:var(--rosebg);border:1px solid var(--rose3);
+  color:var(--rose);border-radius:12px;padding:2px 10px;
+  font-family:'Lora',serif;font-size:.72rem;font-style:italic;
+  cursor:pointer;transition:all .15s;margin-left:8px;white-space:nowrap;
 }
-.step-timer-btn:hover{background:var(--rust);color:white;}
-.step-timer-btn.running{background:var(--rust);color:white;animation:pulse 1s infinite;}
-.step-timer-btn.done{background:rgba(106,144,112,.12);border-color:var(--sage2);color:var(--sage);}
+.step-timer-btn:hover{background:var(--rose);color:white;border-color:var(--rose);}
+.step-timer-btn.running{background:var(--rose);color:white;border-color:var(--rose);animation:pulse 1s infinite;}
+.step-timer-btn.done{background:var(--sagebg);border-color:var(--sage2);color:var(--sage);}
 @keyframes pulse{0%,100%{opacity:1}50%{opacity:.7}}
 .step-timer-display{
   display:inline-flex;align-items:center;gap:6px;margin-left:8px;
-  background:var(--parch);border:1.5px solid var(--brd);
-  border-radius:20px;padding:2px 10px;
-  font-family:'Raleway',sans-serif;font-size:.78rem;font-weight:500;color:var(--dark);
+  background:var(--cream);border:1.5px solid var(--brd);
+  border-radius:12px;padding:2px 10px;
+  font-family:'Lora',serif;font-size:.82rem;color:var(--brown);font-style:italic;
 }
-.step-timer-display.urgent{background:rgba(184,64,48,.08);border-color:var(--rust2);color:var(--rust);}
+.step-timer-display.urgent{background:var(--rosebg);border-color:var(--rose3);color:var(--rose);}
 
+/* rating */
 .rate-btns{display:flex;gap:7px;flex-wrap:wrap;}
 .rb{
-  background:var(--bg);border:1.5px solid var(--brd);
+  background:var(--cream);border:1.5px solid var(--brd);
   border-radius:20px;padding:6px 14px;
-  font-family:'Caveat',cursive;font-size:.9rem;cursor:pointer;
+  font-family:'Dancing Script',cursive;font-size:1rem;cursor:pointer;
   transition:all .15s;display:flex;align-items:center;gap:5px;
+  box-shadow:0 1px 4px var(--shadow);
 }
-.rb:hover{transform:translateY(-1px);}
-.rb.on-nope{background:#F8ECEC;border-color:#D4A8A8;color:#8B3030;}
-.rb.on-ok{background:#FFF4D8;border-color:#D4B870;color:#7A5800;}
-.rb.on-good{background:#EAF5EA;border-color:#90C090;color:#2D5A2D;}
-.rb.on-love{background:var(--rose3);border-color:var(--rose2);color:var(--rust);}
+.rb:hover{transform:translateY(-1px);box-shadow:0 3px 8px var(--shadow2);}
+.rb.on-nope{background:#F8EAEC;border-color:#D4A0A8;color:#8B3040;}
+.rb.on-ok{background:#FFF6E0;border-color:#D4C060;color:#7A6000;}
+.rb.on-good{background:#EAF4EC;border-color:var(--sage2);color:#2D5A3A;}
+.rb.on-love{background:var(--rosebg);border-color:var(--rose3);color:var(--rose);}
 
+/* personal notes */
 .mynotes-wrap{margin-top:20px;}
 .mynote-item{
-  background:rgba(184,144,64,.05);border-left:3px solid var(--gold2);
-  border-radius:0 12px 12px 0;padding:10px 13px;margin-bottom:8px;
+  background:rgba(196,160,64,.07);
+  border-left:3px solid var(--gold2);
+  border-radius:0 10px 10px 0;padding:10px 13px;margin-bottom:8px;
 }
-.mynote-date{font-family:'Raleway',sans-serif;font-size:.64rem;font-weight:500;color:var(--txt3);margin-bottom:3px;letter-spacing:.04em;text-transform:uppercase;}
-.mynote-txt{font-size:.98rem;line-height:1.55;color:var(--txt);font-style:italic;font-family:'Cormorant Garamond',serif;}
+.mynote-date{font-family:'Lora',serif;font-size:.7rem;color:var(--txt3);margin-bottom:3px;font-style:italic;}
+.mynote-txt{font-size:.95rem;line-height:1.55;color:var(--txt);font-style:italic;font-family:'Lora',serif;}
 .mynote-add{display:flex;gap:8px;align-items:flex-end;margin-top:10px;}
 .mynote-ta{
   flex:1;border:1.5px solid var(--brd);border-radius:14px;padding:9px 14px;
-  font-family:'Cormorant Garamond',serif;font-size:1rem;
-  background:var(--bg);color:var(--txt);outline:none;resize:none;transition:border-color .15s;line-height:1.5;
+  font-family:'Lora',serif;font-size:.95rem;
+  background:var(--cream);color:var(--txt);outline:none;resize:none;
+  transition:border-color .15s;line-height:1.5;
 }
 .mynote-ta:focus{border-color:var(--rose2);}
 .mynote-save{
-  background:var(--gold);color:#FFF8E8;border:none;border-radius:20px;
-  padding:9px 16px;font-family:'Raleway',sans-serif;font-size:.74rem;font-weight:600;
+  background:var(--gold);color:white;border:none;border-radius:20px;
+  padding:9px 16px;font-family:'Lora',serif;font-size:.82rem;font-style:italic;
   cursor:pointer;transition:all .15s;white-space:nowrap;align-self:flex-end;
-  box-shadow:0 2px 8px rgba(184,144,64,.2);letter-spacing:.04em;text-transform:uppercase;
+  box-shadow:0 2px 8px rgba(196,160,64,.3);
 }
 .mynote-save:hover{background:var(--gold2);transform:translateY(-1px);}
 
+/* seasonal badge */
 .season-badge{
-  background:rgba(106,144,112,.12);border:1px solid var(--sage2);
-  border-radius:20px;padding:1px 8px;
-  font-family:'Raleway',sans-serif;font-size:.6rem;font-weight:500;
-  color:var(--sage);margin-left:5px;letter-spacing:.04em;
+  background:var(--sagebg);border:1px solid var(--sage2);
+  border-radius:10px;padding:1px 8px;
+  font-family:'Lora',serif;font-size:.62rem;font-style:italic;
+  color:var(--sage);margin-left:5px;
 }
 
-/* ── RATINGS ── */
+/* ── RATINGS PAGE ── */
 .rat-grid{display:grid;grid-template-columns:repeat(2,1fr);gap:14px;margin-bottom:28px;}
 @media(max-width:600px){.rat-grid{grid-template-columns:1fr;}}
-.rat-sec{background:var(--ww);border:1.5px solid var(--brd);border-radius:18px;overflow:hidden;box-shadow:0 2px 10px var(--sh);}
-.rat-hdr{padding:12px 16px;display:flex;align-items:center;gap:9px;border-bottom:1.5px solid var(--brd);}
+.rat-sec{background:var(--ww);border:1.5px solid var(--brd);border-radius:16px;overflow:hidden;box-shadow:0 2px 10px var(--shadow);}
+.rat-hdr{padding:12px 18px;display:flex;align-items:center;gap:9px;border-bottom:1px solid var(--brd);background:var(--cream);}
 .rat-items{padding:12px;display:flex;flex-direction:column;gap:7px;}
 .rat-item{
-  display:flex;align-items:center;gap:10px;padding:9px 11px;
+  display:flex;align-items:center;gap:10px;padding:9px 12px;
   background:var(--bg);border-radius:10px;cursor:pointer;transition:all .15s;
-  border-left:2px solid var(--brd);
+  border-left:3px solid var(--brd);
 }
-.rat-item:hover{border-left-color:var(--rose2);}
-.rat-empty{padding:20px;text-align:center;font-family:'Caveat',cursive;font-size:.98rem;color:var(--txt3);}
-.love-sec{background:var(--ww);border:2px solid var(--gold2);border-radius:18px;overflow:hidden;box-shadow:0 3px 14px rgba(184,144,64,.12);margin-bottom:24px;}
+.rat-item:hover{border-left-color:var(--rose3);background:var(--rosebg);}
+.rat-empty{padding:20px;text-align:center;font-family:'Dancing Script',cursive;font-size:1.05rem;color:var(--txt3);}
+.love-sec{background:var(--ww);border:2px solid var(--rose3);border-radius:16px;overflow:hidden;box-shadow:0 2px 10px rgba(184,96,112,.15);margin-bottom:24px;}
 .love-hdr{
-  background:linear-gradient(135deg,var(--parch),var(--rose3));
+  background:linear-gradient(135deg,#FFF0F2,#FBF3E8);
   padding:14px 18px;display:flex;align-items:center;gap:10px;
-  border-bottom:1.5px solid var(--brd);
+  border-bottom:1px solid var(--rose3);
 }
 
 /* ── SAFE FOOD ── */
 .safe-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:14px;}
 @media(max-width:700px){.safe-grid{grid-template-columns:1fr 1fr;}}
 .safe-card{
-  background:var(--ww);border:1.5px solid rgba(106,144,112,.35);
-  border-radius:18px;overflow:hidden;cursor:pointer;
+  background:var(--ww);border:1.5px solid rgba(106,148,120,.4);
+  border-radius:16px;overflow:hidden;cursor:pointer;
   transition:transform .2s,box-shadow .2s;
-  box-shadow:0 3px 10px rgba(106,144,112,.08);
+  box-shadow:0 2px 10px var(--shadow);
 }
-.safe-card:hover{transform:translateY(-4px);box-shadow:0 8px 20px rgba(106,144,112,.14);}
+.safe-card:hover{transform:translateY(-3px);box-shadow:0 6px 18px rgba(106,148,120,.2);}
 .safe-img{
   height:110px;
-  background:linear-gradient(135deg,rgba(200,220,200,.3),rgba(106,144,112,.15));
+  background:linear-gradient(135deg,rgba(168,197,171,.3),rgba(74,110,80,.15));
   display:flex;align-items:center;justify-content:center;font-size:2.5rem;
-  position:relative;border-bottom:1.5px solid rgba(106,144,112,.25);
+  position:relative;border-bottom:1px solid rgba(106,148,120,.25);
 }
 
 /* ── PLANNER ── */
 .wn{display:flex;align-items:center;gap:14px;margin-bottom:18px;}
 .wn-btn{
   background:var(--ww);border:1.5px solid var(--brd);border-radius:20px;
-  padding:5px 13px;cursor:pointer;font-size:.95rem;color:var(--dark);transition:all .15s;
+  padding:5px 14px;cursor:pointer;font-size:.95rem;color:var(--brown);
+  box-shadow:0 1px 4px var(--shadow);transition:all .15s;
+  font-family:'Lora',serif;
 }
-.wn-btn:hover{border-color:var(--rose2);color:var(--rust);}
-.wn-lbl{font-family:'Cormorant Garamond',serif;font-size:1.1rem;color:var(--dark);font-style:italic;}
+.wn-btn:hover{transform:translateY(-1px);box-shadow:0 3px 8px var(--shadow2);}
+.wn-lbl{font-family:'Playfair Display',serif;font-size:1.05rem;color:var(--brown);font-style:italic;}
 .pgrid{display:grid;grid-template-columns:76px repeat(7,1fr);gap:5px;font-size:.78rem;}
 @media(max-width:700px){.pgrid{grid-template-columns:52px repeat(7,1fr);font-size:.66rem;}}
 .ph{
-  font-family:'Raleway',sans-serif;font-size:.64rem;font-weight:600;text-align:center;
-  padding:7px 3px;color:var(--txt2);background:var(--parch);
-  border-radius:10px;letter-spacing:.06em;text-transform:uppercase;
+  font-family:'Lora',serif;font-size:.72rem;text-align:center;
+  padding:7px 3px;color:var(--txt2);background:var(--cream);
+  border-radius:8px;font-style:italic;
 }
-.ph.td{background:var(--rose3);color:var(--rust);border:1.5px solid var(--rose2);}
-.prl{font-family:'Raleway',sans-serif;font-size:.64rem;font-weight:500;color:var(--txt3);display:flex;align-items:center;padding:3px;letter-spacing:.04em;text-transform:uppercase;}
+.ph.td{background:var(--rose);color:white;border:none;}
+.prl{font-family:'Lora',serif;font-size:.72rem;color:var(--txt3);display:flex;align-items:center;padding:3px;font-style:italic;}
 .pc{
-  background:var(--ww);border:1px dashed var(--brd);border-radius:10px;
+  background:var(--ww);border:1.5px dashed var(--brd);border-radius:10px;
   padding:5px;min-height:50px;font-size:.72rem;color:var(--txt2);
   font-style:italic;cursor:pointer;transition:all .15s;
-  font-family:'Cormorant Garamond',serif;
+  font-family:'Lora',serif;
 }
-.pc:hover{border-color:var(--rose2);}
-.pc.ok{border-style:solid;border-color:var(--sage2);background:rgba(106,144,112,.06);color:var(--sage);font-style:normal;}
+.pc:hover{border-color:var(--rose3);background:var(--rosebg);}
+.pc.ok{border-style:solid;border-color:var(--sage2);background:var(--sagebg);color:var(--sage);font-style:normal;}
 
 /* ── SHOPPING ── */
-.bw{background:var(--ww);border:1.5px solid var(--brd);border-radius:18px;padding:18px;margin-bottom:18px;box-shadow:0 2px 10px var(--sh);}
-.bb{height:7px;background:var(--parch);border-radius:10px;overflow:hidden;}
-.bf{height:100%;background:linear-gradient(90deg,var(--rose2),var(--lavender2));border-radius:10px;transition:width .6s;}
+.bw{background:var(--ww);border:1.5px solid var(--brd);border-radius:16px;padding:18px;margin-bottom:18px;box-shadow:0 2px 10px var(--shadow);}
+.bb{height:8px;background:var(--parch);border-radius:6px;overflow:hidden;}
+.bf{height:100%;background:linear-gradient(90deg,var(--sage),var(--sage2));border-radius:6px;transition:width .6s;}
 .sl2{display:grid;grid-template-columns:1fr 290px;gap:18px;align-items:start;}
 @media(max-width:680px){.sl2{grid-template-columns:1fr;}}
-.slc{background:var(--ww);border:1.5px solid var(--brd);border-radius:18px;overflow:hidden;box-shadow:0 2px 10px var(--sh);}
-.slh{background:var(--parch);padding:12px 18px;display:flex;justify-content:space-between;align-items:center;border-bottom:1.5px solid var(--brd);}
-.si2{display:flex;align-items:center;gap:10px;padding:10px 18px;border-bottom:1px solid rgba(222,200,168,.25);transition:background .15s;}
-.si2:hover{background:var(--bg);}
-.scb{width:17px;height:17px;border:2px solid var(--brd);border-radius:5px;cursor:pointer;flex-shrink:0;display:flex;align-items:center;justify-content:center;background:white;}
+.slc{background:var(--ww);border:1.5px solid var(--brd);border-radius:16px;overflow:hidden;box-shadow:0 2px 10px var(--shadow);}
+.slh{background:var(--cream);padding:12px 18px;display:flex;justify-content:space-between;align-items:center;border-bottom:1.5px solid var(--brd);}
+.si2{display:flex;align-items:center;gap:10px;padding:10px 18px;border-bottom:1px solid rgba(216,196,176,.3);transition:background .15s;}
+.si2:hover{background:var(--cream);}
+.scb{width:18px;height:18px;border:2px solid var(--brd);border-radius:50%;cursor:pointer;flex-shrink:0;display:flex;align-items:center;justify-content:center;background:white;}
 .scb.ck{background:var(--sage);border-color:var(--sage);color:white;}
-.sn{flex:1;font-size:.92rem;font-family:'Cormorant Garamond',serif;}
+.sn{flex:1;font-size:.9rem;font-family:'Lora',serif;}
 .sn.dn{text-decoration:line-through;color:var(--txt3);}
-.sa{font-family:'Raleway',sans-serif;font-size:.7rem;font-weight:500;color:var(--txt3);}
-.sp{font-family:'Raleway',sans-serif;font-size:.78rem;font-weight:600;color:var(--rust);min-width:54px;text-align:right;}
+.sa{font-family:'Lora',serif;font-size:.72rem;color:var(--txt3);font-style:italic;}
+.sp{font-family:'Lora',serif;font-size:.82rem;color:var(--rose);min-width:54px;text-align:right;font-style:italic;}
 .air{padding:11px 18px;display:flex;gap:7px;}
-.ab{background:var(--rust);color:#FFF5F0;border:none;border-radius:20px;padding:7px 14px;cursor:pointer;font-size:.95rem;box-shadow:0 2px 6px rgba(184,64,48,.2);}
-.ab:hover{background:var(--rust2);}
-.sside{background:var(--ww);border:1.5px solid var(--brd);border-radius:18px;padding:18px;box-shadow:0 2px 10px var(--sh);}
+.ab{background:var(--rose);color:white;border:none;border-radius:20px;padding:7px 16px;cursor:pointer;font-size:.9rem;box-shadow:0 2px 8px rgba(184,96,112,.25);font-family:'Lora',serif;}
+.ab:hover{background:var(--rose2);}
+.sside{background:var(--ww);border:1.5px solid var(--brd);border-radius:16px;padding:18px;box-shadow:0 2px 10px var(--shadow);}
 
 /* ── PANTRY ── */
-.shelf{background:var(--ww);border:1.5px solid var(--brd);border-radius:18px;margin-bottom:18px;overflow:hidden;box-shadow:0 2px 10px var(--sh);}
+.shelf{background:var(--ww);border:1.5px solid var(--brd);border-radius:16px;margin-bottom:18px;overflow:hidden;box-shadow:0 2px 10px var(--shadow);}
 .sh2{
-  background:linear-gradient(90deg,var(--parch),var(--rose3));
+  background:linear-gradient(135deg,#FFF0F2,#F8F1E6);
   padding:12px 18px;display:flex;align-items:center;gap:9px;
   border-bottom:1.5px solid var(--brd);
 }
 .shitems{padding:14px;display:flex;flex-wrap:wrap;gap:9px;}
 .shi{
-  background:var(--bg);border:1.5px solid var(--brd);
+  background:var(--cream);border:1.5px solid var(--brd);
   border-radius:12px;padding:9px 12px;
   display:flex;align-items:center;gap:7px;font-size:.8rem;position:relative;
   cursor:pointer;transition:box-shadow .15s;
+  box-shadow:0 1px 4px var(--shadow);
 }
-.shi:hover{box-shadow:0 3px 10px var(--sh);}
-.shi.low{border-color:var(--rust2);background:rgba(184,64,48,.04);}
-.shi.empty{border-color:#D4A8A8;background:rgba(212,168,168,.06);opacity:.7;}
-.shi-qty{font-family:'Raleway',sans-serif;font-size:.8rem;font-weight:700;color:var(--dark);margin-top:1px;}
-.shi-unit{font-family:'Raleway',sans-serif;font-size:.64rem;color:var(--txt3);}
-.qty-bar-wrap{width:100%;height:4px;background:rgba(0,0,0,.05);border-radius:3px;margin-top:5px;overflow:hidden;}
+.shi:hover{box-shadow:0 3px 10px var(--shadow2);}
+.shi.low{border-color:var(--rose3);background:var(--rosebg);}
+.shi.empty{border-color:#C4A0A0;background:rgba(200,120,120,.06);opacity:.7;}
+.shi-qty{font-family:'Playfair Display',serif;font-size:.8rem;font-weight:600;color:var(--brown);margin-top:1px;}
+.shi-unit{font-family:'Lora',serif;font-size:.66rem;color:var(--txt3);font-style:italic;}
+.qty-bar-wrap{width:100%;height:4px;background:rgba(0,0,0,.06);border-radius:3px;margin-top:5px;overflow:hidden;}
 .qty-bar{height:100%;border-radius:3px;transition:width .4s;}
 .shi-edit-btn{position:absolute;top:5px;right:6px;background:none;border:none;font-size:.65rem;color:var(--txt3);cursor:pointer;opacity:0;transition:opacity .15s;}
 .shi:hover .shi-edit-btn{opacity:1;}
-.shi-edit-inp{width:60px;border:1.5px solid var(--rose2);border-radius:10px;padding:2px 6px;font-family:'Raleway',sans-serif;font-size:.82rem;text-align:center;outline:none;background:white;}
-.pantry-legend{display:flex;gap:12px;margin-bottom:14px;font-family:'Raleway',sans-serif;font-size:.68rem;font-weight:500;color:var(--txt3);flex-wrap:wrap;letter-spacing:.03em;}
+.shi-edit-inp{width:60px;border:1.5px solid var(--rose3);border-radius:10px;padding:2px 6px;font-family:'Lora',serif;font-size:.82rem;text-align:center;outline:none;background:white;}
+.pantry-legend{display:flex;gap:12px;margin-bottom:14px;font-family:'Lora',serif;font-size:.72rem;color:var(--txt3);flex-wrap:wrap;font-style:italic;}
 .pl-dot{width:10px;height:10px;border-radius:50%;display:inline-block;margin-right:4px;}
 
 /* ── WISHLIST ── */
 .wgrid{display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-bottom:20px;}
 @media(max-width:580px){.wgrid{grid-template-columns:1fr;}}
 .wc{
-  background:var(--ww);border:1.5px solid var(--brd);border-radius:18px;
+  background:var(--ww);border:1.5px solid var(--brd);border-radius:16px;
   padding:14px;display:flex;align-items:center;gap:12px;
-  box-shadow:0 2px 10px var(--sh);transition:all .2s;
+  box-shadow:0 2px 8px var(--shadow);transition:all .2s;
 }
-.wc:hover{transform:translateY(-3px);box-shadow:0 6px 18px var(--sh);}
+.wc:hover{transform:translateY(-2px);box-shadow:0 5px 16px var(--shadow2);}
 .wc.dn{opacity:.6;background:var(--bg);}
-.wn2{font-family:'Cormorant Garamond',serif;font-size:1.05rem;color:var(--dark);font-style:italic;margin-bottom:2px;}
+.wn2{font-family:'Playfair Display',serif;font-size:1rem;color:var(--brown);font-style:italic;margin-bottom:2px;}
 .wc.dn .wn2{text-decoration:line-through;}
-.wcat{font-family:'Raleway',sans-serif;font-size:.64rem;color:var(--txt3);letter-spacing:.04em;font-weight:500;text-transform:uppercase;}
+.wcat{font-family:'Lora',serif;font-size:.7rem;color:var(--txt3);font-style:italic;}
 .wtog{width:26px;height:26px;border-radius:50%;border:2px solid var(--brd);background:white;cursor:pointer;display:flex;align-items:center;justify-content:center;font-size:.85rem;transition:all .2s;flex-shrink:0;}
 .wtog.dn{background:var(--sage);border-color:var(--sage);color:white;}
-.wadd{background:var(--ww);border:1.5px solid var(--brd);border-radius:18px;padding:14px;display:flex;gap:9px;align-items:center;box-shadow:0 2px 10px var(--sh);}
+.wadd{background:var(--ww);border:1.5px solid var(--brd);border-radius:16px;padding:14px;display:flex;gap:9px;align-items:center;box-shadow:0 2px 8px var(--shadow);}
 
-/* ── CASSETTES ── */
+/* ── CASSETTES — kept mostly original ── */
 .cf{display:flex;gap:7px;flex-wrap:wrap;margin-bottom:28px;}
-.cfb{background:var(--ww);border:1.5px solid var(--brd);border-radius:20px;padding:5px 16px;font-family:'Raleway',sans-serif;font-size:.67rem;font-weight:500;color:var(--txt2);cursor:pointer;transition:all .2s;letter-spacing:.05em;text-transform:uppercase;}
-.cfb:hover{border-color:var(--rose2);color:var(--rust);}
-.cfb.on{background:var(--rose3);border-color:var(--rose2);color:var(--rust);}
+.cfb{background:var(--cream);border:1.5px solid var(--brd);border-radius:20px;padding:5px 16px;font-family:'Lora',serif;font-size:.78rem;color:var(--txt2);cursor:pointer;transition:all .2s;font-style:italic;}
+.cfb:hover{border-color:var(--rose3);color:var(--rose);}
+.cfb.on{background:var(--rose);border-color:var(--rose);color:white;}
 .cgrid{display:grid;grid-template-columns:repeat(3,1fr);gap:28px;}
 @media(max-width:840px){.cgrid{grid-template-columns:1fr 1fr;}}
 @media(max-width:540px){.cgrid{grid-template-columns:1fr;}}
-.cwrap:hover .cshell{transform:translateY(-5px) rotate(-1.5deg);filter:drop-shadow(0 12px 26px rgba(0,0,0,.35));}
-.cshell{position:relative;width:100%;padding-bottom:62%;transition:transform .25s,filter .25s;filter:drop-shadow(0 4px 14px rgba(0,0,0,.22));}
+.cwrap:hover .cshell{transform:translateY(-5px) rotate(-1.5deg);filter:drop-shadow(0 12px 26px rgba(0,0,0,.4));}
+.cshell{position:relative;width:100%;padding-bottom:62%;transition:transform .25s,filter .25s;filter:drop-shadow(0 4px 14px rgba(0,0,0,.3));}
 .cbody{position:absolute;inset:0;border-radius:9px;overflow:hidden;}
 .cnotch{position:absolute;top:0;left:50%;transform:translateX(-50%);width:34%;height:11%;border-radius:0 0 7px 7px;z-index:4;}
 .clabel{position:absolute;top:17%;left:8%;right:8%;height:35%;border-radius:5px;z-index:3;display:flex;flex-direction:column;justify-content:center;padding:0 10px;overflow:hidden;}
 .cls{position:absolute;left:0;right:0;height:1px;opacity:.2;background:rgba(0,0,0,.8);}
-.cchn{font-family:'Cormorant Garamond',serif;font-size:clamp(.5rem,1.5vw,.75rem);font-weight:700;letter-spacing:.04em;text-transform:uppercase;line-height:1.2;position:relative;z-index:4;}
-.cctp{font-family:'Raleway',sans-serif;font-size:clamp(.38rem,1.1vw,.58rem);font-weight:500;opacity:.8;position:relative;z-index:4;margin-top:2px;letter-spacing:.06em;text-transform:uppercase;}
+.cchn{font-family:'Playfair Display',serif;font-size:clamp(.5rem,1.5vw,.75rem);font-weight:700;letter-spacing:.04em;text-transform:uppercase;line-height:1.2;position:relative;z-index:4;}
+.cctp{font-family:'Lora',serif;font-size:clamp(.45rem,1.3vw,.66rem);opacity:.8;position:relative;z-index:4;margin-top:2px;font-style:italic;}
 .cwin{position:absolute;bottom:9%;left:50%;transform:translateX(-50%);width:62%;height:27%;border-radius:6px;z-index:2;display:flex;align-items:center;justify-content:space-around;padding:0 8%;}
 .reel{width:36%;aspect-ratio:1;border-radius:50%;border:2px solid rgba(0,0,0,.15);position:relative;display:flex;align-items:center;justify-content:center;}
 .reel::before{content:'';width:30%;aspect-ratio:1;border-radius:50%;background:rgba(0,0,0,.2);position:absolute;}
@@ -671,108 +672,167 @@ body{
 .cscr{position:absolute;width:5%;aspect-ratio:1;border-radius:50%;background:rgba(255,255,255,.07);border:1px solid rgba(255,255,255,.1);z-index:4;}
 .cscr.tl{top:6%;left:5%;}.cscr.tr{top:6%;right:5%;}.cscr.bl{bottom:6%;left:5%;}.cscr.br{bottom:6%;right:5%;}
 .cinfo{margin-top:12px;padding:0 2px;}
-.cname{font-family:'Cormorant Garamond',serif;font-size:.95rem;color:var(--dark);font-style:italic;margin-bottom:4px;}
-.cdesc{font-size:.84rem;color:var(--txt3);line-height:1.5;margin-bottom:9px;font-family:'Cormorant Garamond',serif;}
+.cname{font-family:'Playfair Display',serif;font-size:.95rem;color:var(--brown);font-style:italic;margin-bottom:4px;}
+.cdesc{font-size:.82rem;color:var(--txt3);line-height:1.5;margin-bottom:9px;font-family:'Lora',serif;}
 .ctags{display:flex;gap:5px;flex-wrap:wrap;margin-bottom:9px;}
-.ctag{background:var(--bg);border:1px solid var(--brd);border-radius:20px;padding:2px 10px;font-family:'Raleway',sans-serif;font-size:.62rem;font-weight:500;color:var(--txt2);letter-spacing:.04em;}
-.clink{display:inline-flex;align-items:center;gap:5px;background:var(--dark);border:1px solid var(--gold2);color:var(--gold3);border-radius:20px;padding:6px 14px;font-family:'Raleway',sans-serif;font-size:.7rem;font-weight:500;text-decoration:none;transition:all .15s;letter-spacing:.05em;text-transform:uppercase;}
-.clink:hover{background:rgba(184,144,64,.15);color:var(--gold);}
-.add-cc{display:flex;flex-direction:column;align-items:center;justify-content:center;gap:10px;border:2px dashed var(--brd);border-radius:18px;padding:28px 18px;cursor:pointer;color:var(--txt3);font-family:'Caveat',cursive;font-size:.95rem;transition:all .2s;min-height:190px;}
-.add-cc:hover{border-color:var(--rose2);color:var(--rust);}
+.ctag{background:var(--cream);border:1px solid var(--brd);border-radius:10px;padding:2px 10px;font-family:'Lora',serif;font-size:.66rem;color:var(--txt2);font-style:italic;}
+.clink{display:inline-flex;align-items:center;gap:5px;background:var(--brown);border:1px solid var(--brown2);color:#FFF8F0;border-radius:12px;padding:6px 14px;font-family:'Lora',serif;font-size:.78rem;text-decoration:none;transition:all .15s;font-style:italic;box-shadow:0 2px 6px rgba(74,46,30,.25);}
+.clink:hover{background:var(--rose);border-color:var(--rose);transform:translateY(-1px);}
+.add-cc{display:flex;flex-direction:column;align-items:center;justify-content:center;gap:10px;border:2px dashed var(--brd);border-radius:16px;padding:28px 18px;cursor:pointer;color:var(--txt3);font-family:'Dancing Script',cursive;font-size:1.1rem;transition:all .2s;min-height:190px;}
+.add-cc:hover{border-color:var(--rose3);color:var(--rose);background:var(--rosebg);}
 
 /* ── MOON ── */
 .moon-widget{
-  background:linear-gradient(135deg,#F4EFF8,#EDE8F5);
-  border:1.5px solid var(--lavender2);border-radius:18px;padding:18px 20px;
+  background:linear-gradient(135deg,#1E1628,#2A1E38);
+  border:1px solid rgba(148,148,190,.3);
+  border-radius:16px;padding:18px 20px;
   display:flex;align-items:center;gap:16px;
-  box-shadow:0 3px 14px rgba(160,140,200,.1);
+  box-shadow:0 4px 16px rgba(20,12,36,.3);
 }
-.moon-big{font-size:2.8rem;line-height:1;filter:drop-shadow(0 0 10px rgba(184,168,200,.5));}
+.moon-big{font-size:2.8rem;line-height:1;filter:drop-shadow(0 0 10px rgba(180,180,216,.4));}
 .moon-info{flex:1;}
-.moon-phase-name{font-family:'Cormorant Garamond',serif;font-size:1.05rem;color:#5A4870;font-style:italic;margin-bottom:3px;}
-.moon-tip{font-family:'Caveat',cursive;font-size:.9rem;color:#7A6888;line-height:1.4;}
-.moon-date{font-family:'Raleway',sans-serif;font-size:.62rem;color:#9A88A8;margin-top:4px;letter-spacing:.06em;font-weight:500;text-transform:uppercase;}
+.moon-phase-name{font-family:'Playfair Display',serif;font-size:1rem;color:#E8E0FF;font-style:italic;margin-bottom:3px;}
+.moon-tip{font-family:'Lora',serif;font-size:.88rem;color:#C0B0E0;line-height:1.4;font-style:italic;}
+.moon-date{font-family:'Lora',serif;font-size:.65rem;color:#9080B0;margin-top:4px;font-style:italic;}
 
 /* ── WEEKLY KBJU ── */
-.wkbju-wrap{background:var(--ww);border:1.5px solid var(--brd);border-radius:18px;padding:20px;margin-top:24px;box-shadow:0 2px 10px var(--sh);}
+.wkbju-wrap{background:var(--ww);border:1.5px solid var(--brd);border-radius:16px;padding:20px;margin-top:24px;box-shadow:0 2px 10px var(--shadow);}
 .wkbju-days{display:grid;grid-template-columns:repeat(7,1fr);gap:8px;margin-bottom:18px;}
 .wkbju-day{display:flex;flex-direction:column;align-items:center;gap:5px;}
-.wkbju-day-label{font-family:'Raleway',sans-serif;font-size:.64rem;font-weight:600;color:var(--txt3);letter-spacing:.06em;text-transform:uppercase;}
-.wkbju-day-label.today{color:var(--rust);font-weight:700;}
+.wkbju-day-label{font-family:'Lora',serif;font-size:.72rem;color:var(--txt3);font-style:italic;}
+.wkbju-day-label.today{color:var(--rose);font-weight:600;}
 .wkbju-bar-wrap{width:100%;display:flex;flex-direction:column;gap:3px;}
-.wkbju-mini-bar{height:6px;border-radius:3px;background:var(--parch);overflow:hidden;}
+.wkbju-mini-bar{height:6px;border-radius:3px;background:var(--parch);overflow:hidden;position:relative;}
 .wkbju-mini-fill{height:100%;border-radius:3px;transition:width .5s;}
-.wkbju-kcal-val{font-family:'Raleway',sans-serif;font-size:.62rem;font-weight:600;color:var(--txt2);text-align:center;}
-.wkbju-kcal-val.over{color:var(--rust2);}
+.wkbju-kcal-val{font-family:'Lora',serif;font-size:.68rem;color:var(--txt2);text-align:center;font-style:italic;}
+.wkbju-kcal-val.over{color:var(--rose2);}
 .wkbju-kcal-val.empty{color:var(--brd);}
 .wkbju-totals{display:grid;grid-template-columns:repeat(4,1fr);gap:10px;margin-bottom:16px;}
-.wkbju-total-card{background:var(--bg);border:1.5px solid var(--brd);border-radius:12px;padding:12px;text-align:center;}
-.wkbju-total-val{font-family:'Cormorant Garamond',serif;font-size:1.2rem;font-weight:600;}
-.wkbju-total-lbl{font-family:'Raleway',sans-serif;font-size:.62rem;font-weight:500;color:var(--txt3);margin-top:2px;letter-spacing:.04em;text-transform:uppercase;}
-.wkbju-total-pct{font-family:'Caveat',cursive;font-size:.74rem;margin-top:3px;}
-.wkbju-verdict{background:linear-gradient(135deg,rgba(106,144,112,.08),rgba(170,204,170,.05));border:1.5px solid var(--sage2);border-radius:12px;padding:14px;display:flex;align-items:center;gap:12px;}
+.wkbju-total-card{background:var(--cream);border:1.5px solid var(--brd);border-radius:12px;padding:12px;text-align:center;box-shadow:0 1px 4px var(--shadow);}
+.wkbju-total-val{font-family:'Playfair Display',serif;font-size:1.1rem;font-weight:700;}
+.wkbju-total-lbl{font-family:'Lora',serif;font-size:.66rem;color:var(--txt3);margin-top:2px;font-style:italic;}
+.wkbju-total-pct{font-family:'Dancing Script',cursive;font-size:.85rem;margin-top:3px;}
+.wkbju-verdict{background:var(--sagebg);border:1.5px solid var(--sage2);border-radius:14px;padding:14px;display:flex;align-items:center;gap:12px;}
 .wkbju-verdict-ico{font-size:2rem;}
-.wkbju-verdict-txt{font-family:'Cormorant Garamond',serif;font-size:.98rem;color:var(--sage);font-style:italic;}
-.wkbju-verdict-sub{font-family:'Raleway',sans-serif;font-size:.64rem;font-weight:500;color:var(--txt3);margin-top:3px;letter-spacing:.03em;text-transform:uppercase;}
+.wkbju-verdict-txt{font-family:'Lora',serif;font-size:.95rem;color:var(--sage);font-style:italic;}
+.wkbju-verdict-sub{font-family:'Lora',serif;font-size:.7rem;color:var(--txt3);margin-top:3px;font-style:italic;}
 
 /* ── EXPENSE CHART ── */
-.exp-wrap{background:var(--ww);border:1.5px solid var(--brd);border-radius:18px;padding:18px;margin-top:18px;box-shadow:0 2px 10px var(--sh);}
+.exp-wrap{background:var(--ww);border:1.5px solid var(--brd);border-radius:16px;padding:18px;margin-top:18px;box-shadow:0 2px 10px var(--shadow);}
 .exp-bars{display:flex;align-items:flex-end;gap:10px;height:100px;margin-bottom:8px;}
 .exp-bar-group{flex:1;display:flex;flex-direction:column;align-items:center;gap:3px;}
 .exp-bar-stack{width:100%;display:flex;flex-direction:column;justify-content:flex-end;gap:2px;}
-.exp-bar{border-radius:6px 6px 0 0;min-height:3px;transition:height .4s;}
-.exp-label{font-family:'Raleway',sans-serif;font-size:.62rem;font-weight:500;color:var(--txt3);letter-spacing:.04em;text-transform:uppercase;}
-.exp-label.cur{color:var(--rust);font-weight:700;}
+.exp-bar{border-radius:4px 4px 0 0;min-height:3px;transition:height .4s;}
+.exp-label{font-family:'Lora',serif;font-size:.68rem;color:var(--txt3);font-style:italic;}
+.exp-label.cur{color:var(--rose);font-weight:600;}
 .exp-legend{display:flex;gap:14px;margin-top:8px;}
-.exp-legend-item{display:flex;align-items:center;gap:5px;font-family:'Raleway',sans-serif;font-size:.66rem;font-weight:500;color:var(--txt2);}
-.exp-dot{width:10px;height:10px;border-radius:3px;}
+.exp-legend-item{display:flex;align-items:center;gap:5px;font-family:'Lora',serif;font-size:.7rem;color:var(--txt2);font-style:italic;}
+.exp-dot{width:10px;height:10px;border-radius:50%;}
 
 /* ── DIARY ── */
 .diary-day-header{display:flex;align-items:center;justify-content:space-between;margin-bottom:14px;flex-wrap:wrap;gap:10px;}
-.diary-day-label{font-family:'Cormorant Garamond',serif;font-size:1.1rem;color:var(--dark);font-style:italic;}
+.diary-day-label{font-family:'Playfair Display',serif;font-size:1.1rem;color:var(--brown);font-style:italic;}
 .diary-kbju-bar{display:flex;gap:8px;flex-wrap:wrap;}
-.diary-k{background:var(--bg);border:1.5px solid var(--brd);border-radius:20px;padding:4px 12px;font-family:'Raleway',sans-serif;font-size:.68rem;font-weight:500;color:var(--txt2);display:flex;align-items:center;gap:4px;letter-spacing:.03em;}
+.diary-k{background:var(--cream);border:1.5px solid var(--brd);border-radius:12px;padding:4px 12px;font-family:'Lora',serif;font-size:.74rem;color:var(--txt2);display:flex;align-items:center;gap:4px;font-style:italic;}
 .diary-entries{display:flex;flex-direction:column;gap:8px;margin-bottom:14px;}
-.diary-entry{background:var(--bg);border:1.5px solid var(--brd);border-radius:12px;padding:10px 14px;display:flex;align-items:center;gap:12px;border-left:3px solid var(--rose2);}
+.diary-entry{background:var(--cream);border:1.5px solid var(--brd);border-radius:12px;padding:10px 14px;display:flex;align-items:center;gap:12px;border-left:3px solid var(--rose3);}
 .diary-entry-emoji{font-size:1.4rem;}
-.diary-entry-name{flex:1;font-family:'Cormorant Garamond',serif;font-size:.92rem;color:var(--dark);font-style:italic;}
-.diary-entry-kcal{font-family:'Raleway',sans-serif;font-size:.76rem;font-weight:600;color:var(--rust);}
+.diary-entry-name{flex:1;font-family:'Lora',serif;font-size:.9rem;color:var(--brown);font-style:italic;}
+.diary-entry-kcal{font-family:'Lora',serif;font-size:.8rem;color:var(--rose);font-style:italic;}
 .diary-entry-del{background:none;border:none;color:var(--brd2);cursor:pointer;font-size:.85rem;padding:2px 5px;border-radius:6px;transition:color .15s;}
-.diary-entry-del:hover{color:var(--rust);}
+.diary-entry-del:hover{color:var(--rose);}
 .diary-add-row{display:flex;gap:8px;align-items:center;flex-wrap:wrap;}
-.diary-goal-bar{height:7px;background:var(--parch);border-radius:6px;overflow:hidden;margin-bottom:6px;}
-.diary-goal-fill{height:100%;border-radius:6px;transition:width .4s;}
+.diary-goal-bar{height:7px;background:var(--parch);border-radius:4px;overflow:hidden;margin-bottom:6px;}
+.diary-goal-fill{height:100%;border-radius:4px;transition:width .4s;}
 .diary-nav{display:flex;align-items:center;gap:12px;margin-bottom:22px;}
-.diary-nav-btn{background:var(--ww);border:1.5px solid var(--brd);border-radius:20px;padding:5px 13px;cursor:pointer;font-size:.95rem;color:var(--dark);}
-.diary-week-card{background:var(--ww);border:1.5px solid var(--brd);border-radius:18px;padding:14px;margin-bottom:10px;box-shadow:0 2px 10px var(--sh);}
-.diary-week-row{display:flex;align-items:center;gap:10px;padding:6px 0;border-bottom:1px solid rgba(222,200,168,.2);}
-.diary-week-day{font-family:'Raleway',sans-serif;font-size:.7rem;font-weight:600;color:var(--txt3);width:28px;flex-shrink:0;letter-spacing:.04em;text-transform:uppercase;}
-.diary-week-fill{flex:1;height:7px;background:var(--parch);border-radius:6px;overflow:hidden;}
-.diary-week-bar{height:100%;border-radius:6px;transition:width .4s;}
+.diary-nav-btn{background:var(--ww);border:1.5px solid var(--brd);border-radius:20px;padding:5px 14px;cursor:pointer;font-size:.95rem;color:var(--brown);box-shadow:0 1px 4px var(--shadow);font-family:'Lora',serif;}
+.diary-week-card{background:var(--ww);border:1.5px solid var(--brd);border-radius:14px;padding:14px;margin-bottom:10px;box-shadow:0 2px 8px var(--shadow);}
+.diary-week-row{display:flex;align-items:center;gap:10px;padding:6px 0;border-bottom:1px solid rgba(216,196,176,.25);}
+.diary-week-day{font-family:'Lora',serif;font-size:.75rem;color:var(--txt3);width:28px;flex-shrink:0;font-style:italic;}
+.diary-week-fill{flex:1;height:7px;background:var(--parch);border-radius:4px;overflow:hidden;}
+.diary-week-bar{height:100%;border-radius:4px;transition:width .4s;}
 
 /* ── SEARCH ── */
 .search-wrap{position:relative;margin-bottom:16px;}
-.search-inp{width:100%;border:1.5px solid var(--brd);border-radius:20px;padding:10px 18px 10px 44px;font-family:'Cormorant Garamond',serif;font-size:1rem;background:var(--ww);color:var(--txt);outline:none;transition:border-color .2s;}
+.search-inp{width:100%;border:1.5px solid var(--brd);border-radius:20px;padding:10px 20px 10px 44px;font-family:'Lora',serif;font-size:.95rem;background:var(--ww);color:var(--txt);outline:none;transition:border-color .2s;}
 .search-inp:focus{border-color:var(--rose2);}
 .search-icon{position:absolute;left:16px;top:50%;transform:translateY(-50%);font-size:1rem;pointer-events:none;opacity:.4;}
 .search-clear{position:absolute;right:12px;top:50%;transform:translateY(-50%);background:var(--brd);border:none;border-radius:50%;width:20px;height:20px;cursor:pointer;font-size:.7rem;display:flex;align-items:center;justify-content:center;color:var(--txt2);}
 .search-clear:hover{background:var(--rose2);color:white;}
-.search-count{font-family:'Raleway',sans-serif;font-size:.72rem;font-weight:500;color:var(--txt3);margin-bottom:14px;letter-spacing:.04em;}
-.search-highlight{background:rgba(184,144,64,.18);border-radius:3px;padding:0 2px;}
+.search-count{font-family:'Lora',serif;font-size:.78rem;color:var(--txt3);margin-bottom:14px;font-style:italic;}
+.search-highlight{background:rgba(184,96,112,.18);border-radius:4px;padding:0 2px;}
 
 /* ── CUSTOM CATEGORIES ── */
-.custcat-section{background:var(--ww);border:1.5px solid var(--brd);border-radius:18px;padding:16px;margin-bottom:20px;box-shadow:0 2px 10px var(--sh);}
+.custcat-section{background:var(--ww);border:1.5px solid var(--brd);border-radius:14px;padding:16px;margin-bottom:20px;box-shadow:0 2px 8px var(--shadow);}
 .custcat-list{display:flex;flex-wrap:wrap;gap:8px;margin-bottom:14px;}
-.custcat-chip{display:flex;align-items:center;gap:6px;border-radius:20px;padding:5px 16px;font-family:'Raleway',sans-serif;font-size:.7rem;font-weight:500;cursor:pointer;transition:all .2s;border:1.5px solid;letter-spacing:.04em;text-transform:uppercase;}
+.custcat-chip{display:flex;align-items:center;gap:6px;border-radius:20px;padding:5px 14px;font-family:'Lora',serif;font-size:.74rem;cursor:pointer;transition:all .2s;border:1.5px solid;font-style:italic;}
 .custcat-chip.active{color:white;}
 .custcat-del{background:none;border:none;font-size:.7rem;cursor:pointer;opacity:.6;padding:0 0 0 2px;line-height:1;}
 .custcat-del:hover{opacity:1;}
 .custcat-add{display:flex;gap:8px;align-items:center;}
 .custcat-emoji-pick{display:flex;gap:6px;flex-wrap:wrap;margin-bottom:10px;}
-.ep-btn{background:var(--bg);border:1.5px solid var(--brd);border-radius:10px;padding:4px 8px;font-size:1rem;cursor:pointer;transition:all .15s;}
-.ep-btn.on{border-color:var(--rose2);background:var(--rose3);}
+.ep-btn{background:var(--cream);border:1.5px solid var(--brd);border-radius:10px;padding:4px 8px;font-size:1rem;cursor:pointer;transition:all .15s;}
+.ep-btn.on{border-color:var(--rose);background:var(--rosebg);}
 .rc-custcats{display:flex;gap:4px;flex-wrap:wrap;margin-top:6px;}
-`;
+
+/* ── EDIT / CRUD CONTROLS ── */
+.rc-actions{
+  position:absolute;bottom:0;left:0;right:0;
+  background:linear-gradient(to top,rgba(74,46,30,.82),transparent);
+  display:flex;gap:6px;justify-content:flex-end;padding:8px 10px;
+  opacity:0;transition:opacity .2s;border-radius:0 0 14px 14px;
+}
+.rc:hover .rc-actions{opacity:1;}
+.rc-act-btn{
+  background:rgba(255,251,245,.9);border:none;border-radius:50%;
+  width:28px;height:28px;cursor:pointer;font-size:.85rem;
+  display:flex;align-items:center;justify-content:center;
+  transition:all .15s;flex-shrink:0;
+}
+.rc-act-btn:hover{transform:scale(1.15);}
+.edit-modal{
+  background:var(--ww);border-radius:20px;
+  border:1.5px solid var(--brd);
+  max-width:680px;width:100%;max-height:92vh;
+  overflow-y:auto;
+  box-shadow:0 20px 60px rgba(74,46,30,.25);
+  animation:slideUp .25s ease;
+}
+.edit-modal::-webkit-scrollbar{width:5px;}
+.edit-modal::-webkit-scrollbar-thumb{background:var(--brd);border-radius:10px;}
+.form-label{display:block;font-family:'Lora',serif;font-size:.82rem;color:var(--txt2);font-style:italic;margin-bottom:5px;}
+.form-row{display:flex;gap:10px;}
+.form-ta{width:100%;border:1.5px solid var(--brd);border-radius:12px;padding:9px 14px;font-family:'Lora',serif;font-size:.9rem;background:var(--cream);color:var(--txt);outline:none;resize:vertical;transition:border-color .15s;line-height:1.5;min-height:70px;}
+.form-ta:focus{border-color:var(--rose2);}
+.form-inp{width:100%;border:1.5px solid var(--brd);border-radius:20px;padding:8px 14px;font-family:'Lora',serif;font-size:.9rem;background:var(--ww);color:var(--txt);outline:none;transition:border-color .15s;}
+.form-inp:focus{border-color:var(--rose2);}
+.form-inp-sm{width:90px;border:1.5px solid var(--brd);border-radius:20px;padding:7px 12px;font-family:'Lora',serif;font-size:.88rem;background:var(--ww);color:var(--txt);outline:none;transition:border-color .15s;text-align:center;}
+.form-inp-sm:focus{border-color:var(--rose2);}
+.ing-edit-row{display:flex;gap:8px;align-items:center;padding:7px 10px;background:var(--cream);border-radius:10px;margin-bottom:6px;}
+.step-edit-row{display:flex;gap:8px;align-items:flex-start;padding:7px 10px;background:var(--cream);border-radius:10px;margin-bottom:6px;}
+.step-num-sm{width:24px;height:24px;border-radius:50%;background:var(--rose);color:white;display:flex;align-items:center;justify-content:center;font-family:'Playfair Display',serif;font-size:.78rem;flex-shrink:0;margin-top:2px;}
+.rm-btn{background:none;border:none;cursor:pointer;color:var(--brd2);font-size:.9rem;padding:2px 4px;transition:color .15s;flex-shrink:0;}
+.rm-btn:hover{color:var(--rose);}
+.add-row-btn{background:none;border:1.5px dashed var(--brd);border-radius:20px;padding:5px 16px;font-family:'Lora',serif;font-size:.82rem;font-style:italic;color:var(--txt3);cursor:pointer;transition:all .15s;margin-top:4px;}
+.add-row-btn:hover{border-color:var(--rose3);color:var(--rose);}
+.btn-danger{background:none;border:1.5px solid #D4A0A8;border-radius:20px;padding:7px 18px;font-family:'Lora',serif;font-size:.88rem;font-style:italic;color:#8B3040;cursor:pointer;transition:all .15s;}
+.btn-danger:hover{background:#F8EAEC;border-color:var(--rose);}
+.btn-save{background:var(--rose);color:white;border:none;border-radius:20px;padding:9px 24px;font-family:'Lora',serif;font-size:.95rem;font-style:italic;cursor:pointer;box-shadow:0 2px 8px rgba(184,96,112,.3);transition:all .15s;}
+.btn-save:hover{background:var(--rose2);transform:translateY(-1px);}
+.pantry-add-btn{display:flex;align-items:center;gap:8px;background:var(--ww);border:1.5px dashed var(--brd);border-radius:12px;padding:9px 14px;cursor:pointer;transition:all .15s;font-family:'Lora',serif;font-size:.88rem;font-style:italic;color:var(--txt3);margin-bottom:18px;}
+.pantry-add-btn:hover{border-color:var(--rose3);color:var(--rose);background:var(--rosebg);}
+.shi-del{position:absolute;top:-6px;right:-6px;background:white;border:1.5px solid var(--brd);border-radius:50%;width:18px;height:18px;font-size:.6rem;cursor:pointer;display:none;align-items:center;justify-content:center;transition:all .15s;color:var(--txt3);}
+.shi:hover .shi-del{display:flex;}
+.shi-del:hover{background:var(--rose);border-color:var(--rose);color:white;}
+.wish-edit-inp{flex:1;border:1.5px solid var(--rose3);border-radius:10px;padding:4px 10px;font-family:'Playfair Display',serif;font-size:.95rem;font-style:italic;color:var(--brown);background:white;outline:none;}
+.wish-del-btn{background:none;border:none;cursor:pointer;color:var(--brd2);font-size:.85rem;padding:2px 4px;transition:color .15s;flex-shrink:0;}
+.wish-del-btn:hover{color:var(--rose);}
+.cinfo-actions{display:flex;gap:7px;margin-top:8px;}
+.c-act-btn{background:var(--cream);border:1.5px solid var(--brd);border-radius:20px;padding:4px 12px;font-family:'Lora',serif;font-size:.76rem;font-style:italic;color:var(--txt2);cursor:pointer;transition:all .15s;}
+.c-act-btn:hover{border-color:var(--rose3);color:var(--rose);}
+.c-act-btn.del:hover{border-color:#D4A0A8;color:#8B3040;}
+`
+
 
 // ─── DATA ──────────────────────────────────────────────────────────────
 
@@ -1179,7 +1239,7 @@ function getTodayIdx(){const d=new Date().getDay();return d===0?6:d-1;}
 
 // ─── PANTRY ITEM with qty bar ────────────────────────────────────────────
 
-function PantryItem({item, onEdit}){
+function PantryItem({item, onEdit, onDelete}){
   const [editing, setEditing]=useState(false);
   const [val,setVal]=useState(String(item.qty));
   const pct=Math.max(0,Math.min(100,(item.qty/item.max)*100));
@@ -1213,7 +1273,181 @@ function PantryItem({item, onEdit}){
         </div>
       </div>
       <button className="shi-edit-btn" onClick={()=>{setVal(String(item.qty));setEditing(true);}}>✏️</button>
+      {onDelete&&<button className="shi-del" onClick={e=>{e.stopPropagation();onDelete(item.id);}}>✕</button>}
+    </div>
+  );
+}
 
+// ─── EDIT RECIPE MODAL ───────────────────────────────────────────────────
+
+function EditRecipeModal({recipe, onClose, onSave, onDelete}){
+  const [form,setForm]=useState({
+    name:recipe.name||'',
+    emoji:recipe.emoji||'🍽️',
+    cat:recipe.cat||'Ужин',
+    time:String(recipe.time||30),
+    notes:recipe.notes||'',
+    kcal:String(recipe.kcal||0),
+    b:String(recipe.b||0),
+    f:String(recipe.f||0),
+    u:String(recipe.u||0),
+    safefood:recipe.safefood||false,
+  });
+  const [ings,setIngs]=useState((recipe.ingredients||[]).map((i,idx)=>({...i,_k:idx})));
+  const [steps,setSteps]=useState((recipe.steps||[]).map((s,idx)=>({text:s,_k:idx})));
+  const [confirmDel,setConfirmDel]=useState(false);
+
+  const setF=k=>e=>setForm(p=>({...p,[k]:e.target.value}));
+
+  const addIng=()=>setIngs(p=>[...p,{n:'',amt:'',unit:'г',_k:Date.now()}]);
+  const setIng=(k,field,val)=>setIngs(p=>p.map(i=>i._k===k?{...i,[field]:val}:i));
+  const rmIng=k=>setIngs(p=>p.filter(i=>i._k!==k));
+
+  const addStep=()=>setSteps(p=>[...p,{text:'',_k:Date.now()}]);
+  const setStep=(k,val)=>setSteps(p=>p.map(s=>s._k===k?{...s,text:val}:s));
+  const rmStep=k=>setSteps(p=>p.filter(s=>s._k!==k));
+
+  const save=()=>{
+    const updated={
+      ...recipe,
+      ...form,
+      time:parseInt(form.time)||0,
+      kcal:parseInt(form.kcal)||0,
+      b:parseFloat(form.b)||0,
+      f:parseFloat(form.f)||0,
+      u:parseFloat(form.u)||0,
+      ingredients:ings.filter(i=>i.n).map(({_k,...i})=>({...i,amt:parseFloat(i.amt)||0})),
+      steps:steps.filter(s=>s.text).map(s=>s.text),
+    };
+    onSave(updated);
+    onClose();
+  };
+
+  const EMOJI_LIST=['🍝','🥗','🍲','🥘','🍜','🍛','🫕','🥞','🍳','🥚','🥩','🍗','🐟','🦐','🥦','🥕','🧆','🫔','🥙','🍱','🥟','🍰','🎂','🍮','🍩','🍪','🫖','🍵','🥤','🧃'];
+
+  return (
+    <div className="overlay" onClick={e=>{if(e.target===e.currentTarget)onClose();}}>
+      <div className="edit-modal">
+        <div className="mhdr">
+          <span className="m-emoji">{form.emoji}</span>
+          <div className="m-title" style={{fontSize:'1.1rem'}}>
+            {recipe.id?'Редактировать рецепт':'Новый рецепт'}
+          </div>
+          <button className="m-close" onClick={onClose}>✕</button>
+        </div>
+        <div className="mbody">
+
+          {/* Эмодзи */}
+          <div style={{marginBottom:16}}>
+            <label className="form-label">Эмодзи блюда</label>
+            <div style={{display:'flex',flexWrap:'wrap',gap:6}}>
+              {EMOJI_LIST.map(e=>(
+                <button key={e} onClick={()=>setForm(p=>({...p,emoji:e}))}
+                  style={{background:form.emoji===e?'var(--rosebg)':'var(--cream)',
+                    border:`1.5px solid ${form.emoji===e?'var(--rose3)':'var(--brd)'}`,
+                    borderRadius:10,padding:'4px 7px',fontSize:'1.1rem',cursor:'pointer',transition:'all .15s'}}>
+                  {e}
+                </button>
+              ))}
+            </div>
+          </div>
+
+          {/* Название */}
+          <div style={{marginBottom:14}}>
+            <label className="form-label">Название *</label>
+            <input className="form-inp" value={form.name} onChange={setF('name')} placeholder="Название рецепта..."/>
+          </div>
+
+          {/* Категория и время */}
+          <div className="form-row" style={{marginBottom:14}}>
+            <div style={{flex:1}}>
+              <label className="form-label">Категория</label>
+              <select className="form-inp" value={form.cat} onChange={setF('cat')}
+                style={{cursor:'pointer'}}>
+                {CATS.filter(c=>c!=='Все').map(c=><option key={c}>{c}</option>)}
+              </select>
+            </div>
+            <div>
+              <label className="form-label">Время (мин)</label>
+              <input className="form-inp-sm" value={form.time} onChange={setF('time')} type="number" min="0"/>
+            </div>
+            <div style={{display:'flex',alignItems:'flex-end',paddingBottom:4}}>
+              <label style={{display:'flex',alignItems:'center',gap:6,cursor:'pointer',fontFamily:"'Lora',serif",fontSize:'.82rem',fontStyle:'italic',color:'var(--txt2)'}}>
+                <input type="checkbox" checked={form.safefood} onChange={e=>setForm(p=>({...p,safefood:e.target.checked}))}/>
+                safe food
+              </label>
+            </div>
+          </div>
+
+          {/* КБЖУ */}
+          <div style={{marginBottom:16}}>
+            <label className="form-label">КБЖУ (на порцию)</label>
+            <div className="form-row">
+              {[['kcal','🔥 ккал'],['b','Б г'],['f','Ж г'],['u','У г']].map(([k,lbl])=>(
+                <div key={k} style={{flex:1}}>
+                  <input className="form-inp-sm" style={{width:'100%'}} value={form[k]}
+                    onChange={setF(k)} type="number" min="0" placeholder={lbl}/>
+                  <div style={{textAlign:'center',fontFamily:"'Lora',serif",fontSize:'.7rem',color:'var(--txt3)',fontStyle:'italic',marginTop:3}}>{lbl}</div>
+                </div>
+              ))}
+            </div>
+          </div>
+
+          {/* Ингредиенты */}
+          <div style={{marginBottom:16}}>
+            <label className="form-label">Ингредиенты</label>
+            {ings.map(ing=>(
+              <div key={ing._k} className="ing-edit-row">
+                <input className="form-inp" style={{flex:2}} value={ing.n}
+                  onChange={e=>setIng(ing._k,'n',e.target.value)} placeholder="Название..."/>
+                <input className="form-inp-sm" value={ing.amt}
+                  onChange={e=>setIng(ing._k,'amt',e.target.value)} placeholder="Кол-во" type="number" min="0"/>
+                <input className="form-inp-sm" value={ing.unit}
+                  onChange={e=>setIng(ing._k,'unit',e.target.value)} placeholder="г / мл / шт"/>
+                <button className="rm-btn" onClick={()=>rmIng(ing._k)}>✕</button>
+              </div>
+            ))}
+            <button className="add-row-btn" onClick={addIng}>+ добавить ингредиент</button>
+          </div>
+
+          {/* Шаги */}
+          <div style={{marginBottom:16}}>
+            <label className="form-label">Шаги приготовления</label>
+            {steps.map((s,idx)=>(
+              <div key={s._k} className="step-edit-row">
+                <div className="step-num-sm">{idx+1}</div>
+                <textarea className="form-ta" style={{minHeight:52,flex:1}} value={s.text}
+                  onChange={e=>setStep(s._k,e.target.value)} placeholder="Описание шага..."/>
+                <button className="rm-btn" onClick={()=>rmStep(s._k)}>✕</button>
+              </div>
+            ))}
+            <button className="add-row-btn" onClick={addStep}>+ добавить шаг</button>
+          </div>
+
+          {/* Заметки */}
+          <div style={{marginBottom:22}}>
+            <label className="form-label">Заметки к рецепту</label>
+            <textarea className="form-ta" value={form.notes} onChange={setF('notes')}
+              placeholder="советы, хитрости, что изменить в следующий раз..."/>
+          </div>
+
+          {/* Кнопки */}
+          <div style={{display:'flex',justifyContent:'space-between',alignItems:'center',flexWrap:'wrap',gap:10}}>
+            {recipe.id&&!confirmDel&&(
+              <button className="btn-danger" onClick={()=>setConfirmDel(true)}>🗑 удалить рецепт</button>
+            )}
+            {recipe.id&&confirmDel&&(
+              <div style={{display:'flex',alignItems:'center',gap:8,flexWrap:'wrap'}}>
+                <span style={{fontFamily:"'Lora',serif",fontSize:'.85rem',fontStyle:'italic',color:'#8B3040'}}>точно удалить?</span>
+                <button className="btn-danger" onClick={()=>{onDelete(recipe.id);onClose();}}>да, удалить</button>
+                <button onClick={()=>setConfirmDel(false)} style={{background:'none',border:'none',cursor:'pointer',fontFamily:"'Lora',serif",fontSize:'.85rem',color:'var(--txt3)'}}>отмена</button>
+              </div>
+            )}
+            {!recipe.id&&<div/>}
+            <button className="btn-save" onClick={save}>сохранить ✓</button>
+          </div>
+        </div>
+      </div>
     </div>
   );
 }
@@ -1324,7 +1558,7 @@ function ExpBar({m, maxTotal}){
   );
 }
 
-function ShelfSection({shelf, onEdit}){
+function ShelfSection({shelf, onEdit, onDelete}){
   return (
     <div className="shelf">
       <div className="sh2">
@@ -1333,7 +1567,7 @@ function ShelfSection({shelf, onEdit}){
         <span style={{marginLeft:'auto',fontFamily:"'Caveat',cursive",fontSize:'.85rem',color:'var(--txt3)'}}>{shelf.items.length} позиций</span>
       </div>
       <div className="shitems">
-        {shelf.items.map(item=><PantryItem key={item.id} item={item} onEdit={onEdit}/>)}
+        {shelf.items.map(item=><PantryItem key={item.id} item={item} onEdit={onEdit} onDelete={onDelete}/>)}
       </div>
     </div>
   );
@@ -1345,20 +1579,17 @@ function RecipeModal({recipe:r, onClose, onRate, onAddMissing, pantry, onCook, o
   const [noteText,setNoteText]=useState('');
   const scale=srv/(r.baseServ||2);
 
-  const ingredients=(r.ingredients||r.ings||[]);
-  const steps=(r.steps||[]);
-
-  const cookResult = cooked ? ingredients.map(ing=>{
+  const cookResult = cooked ? r.ingredients.map(ing=>{
     const pm=matchPantry(ing.n,pantry);
     if(!pm) return null;
     const used=ing.amt*scale;
     return {name:pm.n,was:pm.qty,now:Math.max(0,pm.qty-used),unit:pm.unit};
   }).filter(Boolean) : [];
 
-  const missing=ingredients.filter(i=>!matchPantry(i.n,pantry));
+  const missing=r.ingredients.filter(i=>!matchPantry(i.n,pantry));
 
   const handleCook=()=>{
-    onCook(ingredients,scale);
+    onCook(r.ingredients,scale);
     setCooked(true);
   };
 
@@ -1397,7 +1628,7 @@ function RecipeModal({recipe:r, onClose, onRate, onAddMissing, pantry, onCook, o
           <div className="sec">🧺 Ингредиенты</div>
           <div className="ing-legend"><span>✓ есть в полочке</span><span style={{color:'var(--tr)'}}>+ нужно купить</span></div>
           <div className="ing-list">
-            {ingredients.map((ing,i)=>(
+            {r.ingredients.map((ing,i)=>(
               <IngRow key={i} ing={ing} scale={scale} pantry={pantry}/>
             ))}
           </div>
@@ -1418,7 +1649,7 @@ function RecipeModal({recipe:r, onClose, onRate, onAddMissing, pantry, onCook, o
           
           <div className="sec">📋 Приготовление</div>
           <div className="steps">
-            {steps.map((s,i)=>(
+            {r.steps.map((s,i)=>(
               <div key={i} className="step">
                 <div className="step-num">{i+1}</div>
                 <StepTimer text={s} stepIdx={i}/>
@@ -1493,7 +1724,7 @@ function RecipeModal({recipe:r, onClose, onRate, onAddMissing, pantry, onCook, o
 
 // ─── RECIPE CARD ─────────────────────────────────────────────────────────
 
-function RecipeCard({r,onClick}){
+function RecipeCard({r,onClick,onEdit,onDelete}){
   return (
     <div className="rc" onClick={onClick}>
       <div className="rc-img">
@@ -1502,6 +1733,10 @@ function RecipeCard({r,onClick}){
         {r.video&&<span className="rc-vid">▶ видео</span>}
         {r.rating==='love'&&<span className="rc-love">🔥</span>}
         {r.safefood&&<span className="rc-safe">🫧 safe</span>}
+        <div className="rc-actions">
+          <button className="rc-act-btn" title="Редактировать"
+            onClick={e=>{e.stopPropagation();onEdit&&onEdit(r);}}>✏️</button>
+        </div>
       </div>
       <div className="rc-body">
         <div className="rc-name">{r.name}</div>
@@ -1569,9 +1804,9 @@ function DiaryQuickBtn({item, onAdd}){
   );
 }
 
-function DiaryPage({entriesState, setEntriesState}){
+function DiaryPage(){
   const [weekOffset,setWeekOffset]=useState(0);
-  const entries=entriesState||{};
+  const [entries,setEntries]=useState({});
   const [custom,setCustom]=useState('');
   const [customKcal,setCustomKcal]=useState('');
   const [showQuick,setShowQuick]=useState(true);
@@ -1590,10 +1825,10 @@ function DiaryPage({entriesState, setEntriesState}){
   const barColor=pct>=85&&pct<=115?'var(--sage)':pct<85?'var(--gold2)':'var(--tr2)';
 
   const addEntry=item=>{
-    setEntriesState(prev=>({...prev,[selectedDay]:[...(prev[selectedDay]||[]),{...item,id:Date.now()}]}));
+    setEntries(prev=>({...prev,[selectedDay]:[...(prev[selectedDay]||[]),{...item,id:Date.now()}]}));
   };
   const removeEntry=id=>{
-    setEntriesState(prev=>({...prev,[selectedDay]:(prev[selectedDay]||[]).filter(e=>e.id!==id)}));
+    setEntries(prev=>({...prev,[selectedDay]:(prev[selectedDay]||[]).filter(e=>e.id!==id)}));
   };
   const addCustom=()=>{
     if(!custom.trim()||!customKcal) return;
@@ -1836,7 +2071,7 @@ function Highlight({text, query}){
   );
 }
 
-function RecipeCardSearch({r, onClick, query}){
+function RecipeCardSearch({r, onClick, query, onEdit}){
   return (
     <div className="rc" onClick={onClick}>
       <div className="rc-img">
@@ -1845,6 +2080,12 @@ function RecipeCardSearch({r, onClick, query}){
         {r.video&&<span className="rc-vid">▶ видео</span>}
         {r.rating==='love'&&<span className="rc-love">🔥</span>}
         {r.safefood&&<span className="rc-safe">🫧 safe</span>}
+        {onEdit&&(
+          <div className="rc-actions">
+            <button className="rc-act-btn" title="Редактировать"
+              onClick={e=>{e.stopPropagation();onEdit();}}>✏️</button>
+          </div>
+        )}
       </div>
       <div className="rc-body">
         <div className="rc-name"><Highlight text={r.name} query={query}/></div>
@@ -1876,7 +2117,7 @@ function CustomCatChip({cc, active, onClick}){
 
 const EMOJI_OPTIONS=['⚡','🕯️','🌱','🎉','❤️','🌙','☀️','🏠','🍰','🥗','🍲','🌶️','🧁','🫖','💪','👩‍🍳'];
 
-function RecipesPage({recipes, onOpen, customCats, onUpdateCats, onAddRecipe}){
+function RecipesPage({recipes, onOpen, onEdit, onDelete, onAdd, customCats, onUpdateCats}){
   const [cat,setCat]=useState('Все');
   const [activeCustCat,setActiveCustCat]=useState(null);
   const [query,setQuery]=useState('');
@@ -1885,8 +2126,6 @@ function RecipesPage({recipes, onOpen, customCats, onUpdateCats, onAddRecipe}){
   const [newCatEmoji,setNewCatEmoji]=useState('⚡');
   const [newCatPi,setNewCatPi]=useState(0);
   const [assignMode,setAssignMode]=useState(null);
-  const [showAdd,setShowAdd]=useState(false);
-  const [draft,setDraft]=useState({name:'',cat:'Ужин',emoji:'🍲',kcal:300,b:20,f:10,u:20,ings:[],steps:[],notes:'',safefood:false,tags:[]});
 
   let list=recipes;
   if(activeCustCat){
@@ -2054,40 +2293,13 @@ function RecipesPage({recipes, onOpen, customCats, onUpdateCats, onAddRecipe}){
                   </div>
                 </div>
               )}
-              <RecipeCardSearch r={r} onClick={()=>!assignMode&&onOpen(r)} query={query}/>
+              <RecipeCardSearch r={r} onClick={()=>!assignMode&&onOpen(r)} query={query}
+                onEdit={!assignMode?()=>onEdit&&onEdit(r):null}/>
             </div>
           );
         })}
-        {!assignMode&&<button className="add-rc" onClick={()=>setShowAdd(true)}><span style={{fontSize:'1.7rem'}}>＋</span><span>новый рецепт</span></button>}
+        {!assignMode&&<button className="add-rc" onClick={()=>onAdd&&onAdd()}><span style={{fontSize:'1.7rem'}}>＋</span><span>новый рецепт</span></button>}
       </div>
-
-      {showAdd&&(
-        <div className="overlay" onClick={()=>setShowAdd(false)}>
-          <div className="modal" onClick={e=>e.stopPropagation()}>
-            <div className="mhdr"><div className="m-title">Новый рецепт</div><button className="m-close" onClick={()=>setShowAdd(false)}>✕</button></div>
-            <div className="mbody" style={{display:'grid',gap:8}}>
-              <input className="inp" placeholder="Название" value={draft.name} onChange={e=>setDraft({...draft,name:e.target.value})}/>
-              <div style={{display:'flex',gap:8}}>
-                <input className="inp" placeholder="Эмодзи" value={draft.emoji} onChange={e=>setDraft({...draft,emoji:e.target.value})}/>
-                <input className="inp" placeholder="Категория" value={draft.cat} onChange={e=>setDraft({...draft,cat:e.target.value})}/>
-              </div>
-              <textarea className="inp" placeholder="Ингредиенты: каждый с новой строки, формат: название|кол-во" value={draft.ingsText||''} onChange={e=>setDraft({...draft,ingsText:e.target.value})}/>
-              <textarea className="inp" placeholder="Шаги: каждый с новой строки" value={draft.stepsText||''} onChange={e=>setDraft({...draft,stepsText:e.target.value})}/>
-              <button className="btn btn-p" onClick={()=>{
-                const name=draft.name.trim();
-                if(!name){
-                  setShowAdd(false);
-                  return;
-                }
-                const ingredients=(draft.ingsText||'').split('\n').filter(Boolean).map(x=>{const [n,amt]=x.split('|');return {n:(n||'').trim(),amt:Number(amt)||1,u:'шт'};}).filter(i=>i.n);
-                const steps=(draft.stepsText||'').split('\n').map(s=>s.trim()).filter(Boolean);
-                setShowAdd(false);
-                onAddRecipe({...draft,name,id:Date.now(),rating:null,video:false,love:false,time:30,baseServ:2,ingredients,steps,myNotes:[]});
-              }}>сохранить рецепт</button>
-            </div>
-          </div>
-        </div>
-      )}
 
       {list.length===0&&(
         <div style={{textAlign:'center',padding:'40px 20px',fontFamily:"'Caveat',cursive",fontSize:'1rem',color:'var(--txt3)'}}>
@@ -2325,7 +2537,7 @@ function ShoppingPage({extraItems}){
   const [nw,setNw]=useState('');
   const [newCat,setNewCat]=useState('🥬 Овощи и фрукты');
   const [showHousehold,setShowHousehold]=useState(false);
-  useEffect(()=>{if(extraItems?.length){setItems(p=>{const ex=new Set(p.map(i=>i.name.toLowerCase()));const ns=extraItems.filter(e=>!ex.has(e.name.toLowerCase()));return[...p,...ns];});}},[extraItems]);
+  useState(()=>{if(extraItems?.length){setItems(p=>{const ex=new Set(p.map(i=>i.name.toLowerCase()));const ns=extraItems.filter(e=>!ex.has(e.name.toLowerCase()));return[...p,...ns];});}},[extraItems]);
   const budget=3000;
   const total=items.reduce((s,i)=>s+i.price,0);
   const spent=items.filter(i=>i.done).reduce((s,i)=>s+i.price,0);
@@ -2365,9 +2577,8 @@ function ShoppingPage({extraItems}){
             <div key={item.id} className="si2">
               <div className={`scb ${item.done?'ck':''}`} onClick={()=>toggle(item.id)}>{item.done&&'✓'}</div>
               <span className={`sn ${item.done?'dn':''}`}>{item.name}</span>
-              <input className="sa" value={item.amount} onChange={e=>setItems(p=>p.map(x=>x.id===item.id?{...x,amount:e.target.value}:x))} style={{maxWidth:80,border:'1px solid var(--brd)',borderRadius:8,padding:'2px 6px'}}/>
-              <input className="sp" value={item.price} type="number" min="0" onChange={e=>setItems(p=>p.map(x=>x.id===item.id?{...x,price:Number(e.target.value)||0}:x))} style={{maxWidth:75,border:'1px solid var(--brd)',borderRadius:8,padding:'2px 6px'}}/>
-              <button onClick={()=>remove(item.id)} style={{border:'none',background:'transparent',cursor:'pointer',color:'var(--tr)'}}>✕</button>
+              <span className="sa">{item.amount}</span>
+              <span className="sp">{item.price>0?`${item.price} ₽`:'—'}</span>
             </div>
           ))}
           <div className="air" style={{flexDirection:'column',gap:8}}>
@@ -2409,7 +2620,7 @@ function ShoppingPage({extraItems}){
                   onMouseOver={e=>e.currentTarget.style.background='var(--parch)'}
                   onMouseOut={e=>e.currentTarget.style.background='transparent'}>
                   <span>{item.done?'✓':'○'}</span>
-                  <span style={{textDecoration:item.done?'line-through':'none',opacity:item.done?0.5:1}}>{item.name}</span>
+                  <span style={{textDecoration:item.done?'line-through':'none',opacity:item.done?.5:1}}>{item.name}</span>
                   <span style={{marginLeft:'auto',fontFamily:"'Caveat',cursive",color:'var(--txt3)'}}>{item.amount}</span>
                 </div>
               ))}
@@ -2429,7 +2640,7 @@ function ShoppingPage({extraItems}){
           <div className="exp-legend-item"><div className="exp-dot" style={{background:'var(--sage2)'}}/> Еда</div>
           <div className="exp-legend-item"><div className="exp-dot" style={{background:'var(--blush)'}}/> Бытовое</div>
           <div style={{marginLeft:'auto',fontFamily:"'Caveat',cursive",fontSize:'.82rem',color:'var(--txt3)'}}>
-            средняя: {Math.round(EXPENSE_HISTORY.slice(0,-1).reduce((s,m)=>s+m.food+m.house,0)/Math.max(1,EXPENSE_HISTORY.length-1))} ₽/мес
+            средняя: {Math.round(EXPENSE_HISTORY.slice(0,-1).reduce((s,m)=>s+m.food+m.house,0)/5)} ₽/мес
           </div>
         </div>
       </div>
@@ -2437,10 +2648,31 @@ function ShoppingPage({extraItems}){
   );
 }
 
-function PantryPage({pantry, onEditQty, onAddItem, onRemoveItem}){
+function PantryPage({pantry, onEditQty, onAddItem, onDeleteItem}){
   const cats=[...new Set(pantry.map(p=>p.cat))];
   const low=pantry.filter(p=>p.qty<=p.low&&p.qty>0);
   const empty=pantry.filter(p=>p.qty<=0);
+  const [showAdd,setShowAdd]=useState(false);
+  const [newItem,setNewItem]=useState({n:'',e:'🥫',qty:'',max:'',unit:'г',cat:cats[0]||'Крупы и консервы',low:''});
+  const setNI=k=>e=>setNewItem(p=>({...p,[k]:e.target.value}));
+  const PANTRY_EMOJI=['🥫','🌾','🍚','🍝','🧂','🫒','🍯','🥛','🥚','🧀','🧈','🍋','🥕','🧄','🧅','🥦','🍅','🥩','🐟','🫘','🌶️','🫙','🍵','☕','🧃'];
+
+  const saveNew=()=>{
+    if(!newItem.n.trim()) return;
+    const item={
+      id:'u'+Date.now(),
+      n:newItem.n,e:newItem.e,
+      qty:parseFloat(newItem.qty)||0,
+      max:parseFloat(newItem.max)||parseFloat(newItem.qty)||100,
+      unit:newItem.unit||'г',
+      cat:newItem.cat,
+      low:parseFloat(newItem.low)||10,
+    };
+    onAddItem(item);
+    setNewItem({n:'',e:'🥫',qty:'',max:'',unit:'г',cat:cats[0]||'Крупы и консервы',low:''});
+    setShowAdd(false);
+  };
+
   return (
     <div>
       <div className="pt">🗄️ Мои полочки</div>
@@ -2453,12 +2685,6 @@ function PantryPage({pantry, onEditQty, onAddItem, onRemoveItem}){
         <span className="tag">📦 всего {pantry.length} позиций</span>
       </div>
 
-      <div style={{display:'flex',gap:8,marginBottom:12,flexWrap:'wrap'}}>
-        <input id="pantry-name" className="inp" placeholder="новый продукт..." style={{maxWidth:220}}/>
-        <input id="pantry-cat" className="inp" placeholder="категория" style={{maxWidth:160}}/>
-        <button className="btn btn-p" onClick={()=>{const n=document.getElementById('pantry-name').value.trim();const c=document.getElementById('pantry-cat').value.trim()||'Другое'; if(!n) return; onAddItem({n,cat:c}); document.getElementById('pantry-name').value='';}}>добавить</button>
-      </div>
-
       <div className="pantry-legend">
         <span><span className="pl-dot" style={{background:'var(--sage2)'}}/> в наличии</span>
         <span><span className="pl-dot" style={{background:'#D4A843'}}/> меньше половины</span>
@@ -2466,27 +2692,69 @@ function PantryPage({pantry, onEditQty, onAddItem, onRemoveItem}){
         <span><span className="pl-dot" style={{background:'#C4A0A0'}}/> закончилось</span>
       </div>
 
-      {cats.map(cat=>(
-        <div key={cat}>
-          <div style={{display:'flex',alignItems:'center',justifyContent:'space-between',margin:'10px 0 6px'}}>
-            <span className="tag">{cat}</span>
+      <button className="pantry-add-btn" onClick={()=>setShowAdd(s=>!s)}>
+        <span style={{fontSize:'1.2rem'}}>＋</span> добавить продукт на полочку
+      </button>
+
+      {showAdd&&(
+        <div style={{background:'var(--ww)',border:'1.5px solid var(--rose3)',borderRadius:16,padding:18,marginBottom:18,boxShadow:'0 2px 10px var(--shadow)'}}>
+          <div style={{fontFamily:"'Playfair Display',serif",fontSize:'1rem',color:'var(--brown)',fontStyle:'italic',marginBottom:14}}>Новый продукт</div>
+          <div style={{display:'flex',flexWrap:'wrap',gap:6,marginBottom:12}}>
+            {PANTRY_EMOJI.map(e=>(
+              <button key={e} onClick={()=>setNewItem(p=>({...p,e}))}
+                style={{background:newItem.e===e?'var(--rosebg)':'var(--cream)',border:`1.5px solid ${newItem.e===e?'var(--rose3)':'var(--brd)'}`,borderRadius:8,padding:'3px 6px',fontSize:'1rem',cursor:'pointer'}}>
+                {e}
+              </button>
+            ))}
           </div>
-          {pantry.filter(p=>p.cat===cat).map(item=>(
-            <div key={item.id} style={{display:'flex',alignItems:'center',gap:8,marginBottom:6}}>
-              <div style={{flex:1}}><PantryItem item={item} onEdit={onEditQty}/></div>
-              <button onClick={()=>onRemoveItem(item.id)} style={{border:'none',background:'transparent',color:'var(--tr)',cursor:'pointer'}}>✕</button>
+          <div style={{display:'flex',flexWrap:'wrap',gap:10,marginBottom:12}}>
+            <input className="form-inp" style={{flex:2,minWidth:140}} value={newItem.n} onChange={setNI('n')} placeholder="Название продукта..."/>
+            <input className="form-inp-sm" value={newItem.qty} onChange={setNI('qty')} placeholder="Кол-во" type="number" min="0"/>
+            <input className="form-inp-sm" value={newItem.unit} onChange={setNI('unit')} placeholder="г/мл/шт"/>
+          </div>
+          <div style={{display:'flex',flexWrap:'wrap',gap:10,marginBottom:14}}>
+            <div style={{flex:1}}>
+              <label className="form-label">Категория</label>
+              <select className="form-inp" value={newItem.cat} onChange={setNI('cat')} style={{cursor:'pointer'}}>
+                {[...cats,'+ новая'].map(c=><option key={c}>{c}</option>)}
+              </select>
             </div>
-          ))}
+            <div>
+              <label className="form-label">Макс. количество</label>
+              <input className="form-inp-sm" value={newItem.max} onChange={setNI('max')} placeholder="Макс" type="number" min="0"/>
+            </div>
+            <div>
+              <label className="form-label">Порог «мало»</label>
+              <input className="form-inp-sm" value={newItem.low} onChange={setNI('low')} placeholder="Порог" type="number" min="0"/>
+            </div>
+          </div>
+          <div style={{display:'flex',gap:10}}>
+            <button className="btn-save" onClick={saveNew}>добавить ✓</button>
+            <button onClick={()=>setShowAdd(false)} style={{background:'none',border:'none',cursor:'pointer',fontFamily:"'Lora',serif",fontSize:'.9rem',color:'var(--txt3)'}}>отмена</button>
+          </div>
         </div>
+      )}
+
+      {cats.map(cat=>(
+        <ShelfSection key={cat} shelf={{cat, items:pantry.filter(p=>p.cat===cat)}} onEdit={onEditQty} onDelete={onDeleteItem}/>
       ))}
     </div>
   );
 }
 
-function WishlistPage({wishes, setWishes}){
+function WishlistPage(){
+  const [wishes,setWishes]=useState(WISHES_DATA);
   const [nw,setNw]=useState('');
+  const [editingId,setEditingId]=useState(null);
+  const [editVal,setEditVal]=useState('');
   const toggle=id=>setWishes(p=>p.map(w=>w.id===id?{...w,done:!w.done}:w));
+  const del=id=>setWishes(p=>p.filter(w=>w.id!==id));
   const add=()=>{if(!nw.trim())return;setWishes(p=>[...p,{id:Date.now(),n:nw,cat:'Другое',e:'🍽️',done:false}]);setNw('');};
+  const startEdit=(w)=>{setEditingId(w.id);setEditVal(w.n);};
+  const saveEdit=id=>{
+    if(editVal.trim()) setWishes(p=>p.map(w=>w.id===id?{...w,n:editVal.trim()}:w));
+    setEditingId(null);
+  };
   const done=wishes.filter(w=>w.done).length;
   return (
     <div>
@@ -2497,14 +2765,26 @@ function WishlistPage({wishes, setWishes}){
         <span style={{fontFamily:"'Playfair Display',serif",fontSize:'1.2rem',color:'var(--brn)',fontStyle:'italic'}}>{getMonthRu()}</span>
         <span className="tag">✅ {done} из {wishes.length}</span>
         <div style={{flex:1,height:6,background:'var(--parch)',borderRadius:6,overflow:'hidden',maxWidth:180}}>
-          <div style={{height:'100%',width:`${(done/wishes.length)*100}%`,background:'linear-gradient(90deg,var(--sage),var(--sage2))',borderRadius:6,transition:'width .4s'}}/>
+          <div style={{height:'100%',width:`${wishes.length?(done/wishes.length)*100:0}%`,background:'linear-gradient(90deg,var(--sage),var(--sage2))',borderRadius:6,transition:'width .4s'}}/>
         </div>
       </div>
       <div className="wgrid">
         {wishes.map(w=>(
           <div key={w.id} className={`wc ${w.done?'dn':''}`}>
             <span style={{fontSize:'1.8rem'}}>{w.e}</span>
-            <div style={{flex:1}}><div className="wn2">{w.n}</div><div className="wcat">{w.cat}</div></div>
+            <div style={{flex:1}}>
+              {editingId===w.id?(
+                <input className="wish-edit-inp" autoFocus value={editVal}
+                  onChange={e=>setEditVal(e.target.value)}
+                  onBlur={()=>saveEdit(w.id)}
+                  onKeyDown={e=>{if(e.key==='Enter')saveEdit(w.id);if(e.key==='Escape')setEditingId(null);}}/>
+              ):(
+                <div className="wn2" onDoubleClick={()=>startEdit(w)}>{w.n}</div>
+              )}
+              <div className="wcat">{w.cat}</div>
+            </div>
+            <button className="wish-del-btn" title="Редактировать" onClick={()=>startEdit(w)}>✏️</button>
+            <button className="wish-del-btn" title="Удалить" onClick={()=>del(w.id)}>🗑</button>
             <button className={`wtog ${w.done?'dn':''}`} onClick={()=>toggle(w.id)}>{w.done?'✓':''}</button>
           </div>
         ))}
@@ -2519,7 +2799,7 @@ function WishlistPage({wishes, setWishes}){
   );
 }
 
-function CassetteCard({ch}){
+function CassetteCard({ch, onEdit, onDelete}){
   const [body,label,labelTxt,notch,win]=PALETTES[ch.pi];
   return (
     <div className="cwrap" style={{cursor:'pointer'}}>
@@ -2541,17 +2821,105 @@ function CassetteCard({ch}){
         <div className="cname">{ch.name}</div>
         <div className="cdesc">{ch.desc}</div>
         <div className="ctags">{ch.tags.map(t=><span key={t} className="ctag">#{t}</span>)}</div>
-        <a className="clink" href={ch.url} target="_blank" rel="noreferrer">▶ открыть</a>
+        <div style={{display:'flex',alignItems:'center',gap:8,flexWrap:'wrap'}}>
+          <a className="clink" href={ch.url} target="_blank" rel="noreferrer">▶ открыть</a>
+          <div className="cinfo-actions">
+            <button className="c-act-btn" onClick={()=>onEdit&&onEdit(ch)}>✏️ изменить</button>
+            <button className="c-act-btn del" onClick={()=>onDelete&&onDelete(ch.id)}>🗑</button>
+          </div>
+        </div>
       </div>
     </div>
   );
 }
 
-function CassettesPage({channels, onAddChannel, onRemoveChannel}){
+function EditCassetteModal({ch, onClose, onSave}){
+  const [form,setForm]=useState({
+    name:ch?.name||'',type:ch?.type||'YouTube',
+    desc:ch?.desc||'',url:ch?.url||'',
+    tags:ch?.tags?.join(', ')||'',pi:ch?.pi??0,
+  });
+  const setF=k=>e=>setForm(p=>({...p,[k]:e.target.value}));
+  const save=()=>{
+    if(!form.name.trim()||!form.url.trim()) return;
+    onSave({
+      ...(ch||{}),
+      id:ch?.id||Date.now(),
+      name:form.name,type:form.type,
+      desc:form.desc,url:form.url,
+      tags:form.tags.split(',').map(t=>t.trim()).filter(Boolean),
+      pi:form.pi,
+    });
+    onClose();
+  };
+  return (
+    <div className="overlay" onClick={e=>{if(e.target===e.currentTarget)onClose();}}>
+      <div className="edit-modal" style={{maxWidth:480}}>
+        <div className="mhdr">
+          <span className="m-emoji">📼</span>
+          <div className="m-title" style={{fontSize:'1.1rem'}}>{ch?.id?'Редактировать кассету':'Новая кассета'}</div>
+          <button className="m-close" onClick={onClose}>✕</button>
+        </div>
+        <div className="mbody">
+          <div style={{marginBottom:14}}>
+            <label className="form-label">Цвет кассеты</label>
+            <div style={{display:'flex',gap:8}}>
+              {PALETTES.map(([body],i)=>(
+                <button key={i} onClick={()=>setForm(p=>({...p,pi:i}))}
+                  style={{width:28,height:28,borderRadius:'50%',background:body,border:`3px solid ${form.pi===i?'var(--rose)':'transparent'}`,cursor:'pointer',transition:'border .15s'}}/>
+              ))}
+            </div>
+          </div>
+          <div style={{marginBottom:12}}>
+            <label className="form-label">Название *</label>
+            <input className="form-inp" value={form.name} onChange={setF('name')} placeholder="Название канала или сайта..."/>
+          </div>
+          <div style={{display:'flex',gap:10,marginBottom:12}}>
+            <div style={{flex:1}}>
+              <label className="form-label">Тип</label>
+              <select className="form-inp" value={form.type} onChange={setF('type')} style={{cursor:'pointer'}}>
+                {['YouTube','Сайт','Блог'].map(t=><option key={t}>{t}</option>)}
+              </select>
+            </div>
+          </div>
+          <div style={{marginBottom:12}}>
+            <label className="form-label">Ссылка *</label>
+            <input className="form-inp" value={form.url} onChange={setF('url')} placeholder="https://..."/>
+          </div>
+          <div style={{marginBottom:12}}>
+            <label className="form-label">Описание</label>
+            <textarea className="form-ta" style={{minHeight:52}} value={form.desc} onChange={setF('desc')} placeholder="Коротко о чём..."/>
+          </div>
+          <div style={{marginBottom:18}}>
+            <label className="form-label">Теги (через запятую)</label>
+            <input className="form-inp" value={form.tags} onChange={setF('tags')} placeholder="выпечка, десерты, техники..."/>
+          </div>
+          <button className="btn-save" onClick={save}>сохранить ✓</button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+function CassettesPage(){
+  const [channels,setChannels]=useState(CHANNELS);
   const [filter,setFilter]=useState('Все');
-  const [showAdd,setShowAdd]=useState(false);
-  const [draft,setDraft]=useState({name:'',type:'YouTube',url:'',desc:'',tags:''});
+  const [editCh,setEditCh]=useState(null);   // null | {} для новой | объект для редакт.
+  const [showEdit,setShowEdit]=useState(false);
+
   const list=filter==='Все'?channels:channels.filter(c=>c.type===filter);
+
+  const saveCh=ch=>{
+    setChannels(p=>{
+      const idx=p.findIndex(c=>c.id===ch.id);
+      if(idx===-1) return [...p,ch];
+      return p.map(c=>c.id===ch.id?ch:c);
+    });
+  };
+  const delCh=id=>setChannels(p=>p.filter(c=>c.id!==id));
+  const openNew=()=>{setEditCh({});setShowEdit(true);};
+  const openEdit=ch=>{setEditCh(ch);setShowEdit(true);};
+
   return (
     <div>
       <div className="pt">📼 Полочка с кассетами</div>
@@ -2565,11 +2933,11 @@ function CassettesPage({channels, onAddChannel, onRemoveChannel}){
         ))}
       </div>
       <div className="cgrid">
-        {list.map(ch=><div key={ch.id} style={{position:'relative'}}><CassetteCard ch={ch}/><button onClick={()=>onRemoveChannel(ch.id)} style={{position:'absolute',top:6,right:6,border:'1px solid var(--brd)',borderRadius:14,padding:'2px 8px',background:'var(--ww)',color:'var(--tr)',cursor:'pointer'}}>✕</button></div>)}
-        <button className="add-cc" onClick={()=>setShowAdd(true)}><span style={{fontSize:'2.2rem'}}>📼</span><span>добавить канал</span></button>
+        {list.map(ch=><CassetteCard key={ch.id} ch={ch} onEdit={openEdit} onDelete={delCh}/>)}
+        <div className="add-cc" onClick={openNew}><span style={{fontSize:'2.2rem'}}>📼</span><span>добавить канал</span></div>
       </div>
       <div className="decor" style={{marginTop:28}}>~ нажми на кассету, чтобы открыть канал ~</div>
-      {showAdd&&(<div className="overlay" onClick={()=>setShowAdd(false)}><div className="modal" onClick={e=>e.stopPropagation()}><div className="mhdr"><div className="m-title">Новая кассета</div><button className="m-close" onClick={()=>setShowAdd(false)}>✕</button></div><div className="mbody" style={{display:'grid',gap:8}}><input className="inp" placeholder="Название" value={draft.name} onChange={e=>setDraft({...draft,name:e.target.value})}/><div style={{display:'flex',gap:8}}><select className="inp" value={draft.type} onChange={e=>setDraft({...draft,type:e.target.value})}><option>YouTube</option><option>Сайт</option><option>Блог</option></select><input className="inp" placeholder="URL" value={draft.url} onChange={e=>setDraft({...draft,url:e.target.value})}/></div><textarea className="inp" placeholder="Описание" value={draft.desc} onChange={e=>setDraft({...draft,desc:e.target.value})}/><input className="inp" placeholder="Теги через запятую" value={draft.tags} onChange={e=>setDraft({...draft,tags:e.target.value})}/><button className="btn btn-p" onClick={()=>{if(!draft.name.trim()||!draft.url.trim())return;onAddChannel({id:Date.now(),name:draft.name,type:draft.type,url:draft.url,desc:draft.desc,tags:draft.tags.split(',').map(t=>t.trim()).filter(Boolean),pi:Math.floor(Math.random()*PALETTES.length)});setShowAdd(false);}}>сохранить</button></div></div></div>)}
+      {showEdit&&<EditCassetteModal ch={editCh} onClose={()=>setShowEdit(false)} onSave={saveCh}/>}
     </div>
   );
 }
@@ -2590,64 +2958,26 @@ const TABS=[
   {k:'cassettes',l:'Кассеты',  i:'📼'},
 ];
 
-function App(){
-  const [tab,setTab]=usePersistentState('tab','home');
-  const [recipes,setRecipes]=usePersistentState('recipes',BASE_RECIPES);
-  const [pantry,setPantry]=usePersistentState('pantry',INIT_PANTRY);
-  const [customCats,setCustomCats]=usePersistentState('customCats',INIT_CUSTOM_CATS);
+export default function App(){
+  const [tab,setTab]=useState('home');
+  const [recipes,setRecipes]=useState(BASE_RECIPES);
+  const [pantry,setPantry]=useState(INIT_PANTRY);
+  const [customCats,setCustomCats]=useState(INIT_CUSTOM_CATS);
   const [openRecipe,setOpenRecipe]=useState(null);
-  const [shopExtra,setShopExtra]=usePersistentState('shopExtra',[]);
-  const [wishlist,setWishlist]=usePersistentState('wishlist',WISHES_DATA);
-  const [diaryEntries,setDiaryEntries]=usePersistentState('diaryEntries',{});
-  const [channels,setChannels]=usePersistentState('channels',CHANNELS);
-  const [globalQuery,setGlobalQuery]=useState('');
-  const importInputRef=useRef(null);
-
-  const exportData=()=>{
-    const payload={
-      exportedAt:new Date().toISOString(),
-      version:1,
-      data:{tab,recipes,pantry,customCats,shopExtra,wishlist,diaryEntries,channels}
-    };
-    const blob=new Blob([JSON.stringify(payload,null,2)],{type:'application/json'});
-    const url=URL.createObjectURL(blob);
-    const a=document.createElement('a');
-    const stamp=new Date().toISOString().slice(0,10);
-    a.href=url;
-    a.download=`my-kitchen-backup-${stamp}.json`;
-    document.body.appendChild(a);
-    a.click();
-    a.remove();
-    URL.revokeObjectURL(url);
-  };
-
-  const importData=async e=>{
-    const file=e.target.files&&e.target.files[0];
-    if(!file) return;
-    try{
-      const text=await file.text();
-      const parsed=JSON.parse(text);
-      const d=parsed&&parsed.data?parsed.data:parsed;
-      if(!d||typeof d!=='object') throw new Error('bad');
-      if(Array.isArray(d.recipes)) setRecipes(d.recipes);
-      if(Array.isArray(d.pantry)) setPantry(d.pantry);
-      if(Array.isArray(d.customCats)) setCustomCats(d.customCats);
-      if(Array.isArray(d.shopExtra)) setShopExtra(d.shopExtra);
-      if(Array.isArray(d.wishlist)) setWishlist(d.wishlist);
-      if(d.diaryEntries&&typeof d.diaryEntries==='object') setDiaryEntries(d.diaryEntries);
-      if(Array.isArray(d.channels)) setChannels(d.channels);
-      if(typeof d.tab==='string') setTab(d.tab);
-      alert('Импорт выполнен ✅');
-    }catch(err){
-      alert('Не удалось импортировать файл. Проверь формат JSON.');
-    }finally{
-      e.target.value='';
-    }
-  };
+  const [editRecipe,setEditRecipe]=useState(null);  // null | {} новый | объект для редакт.
+  const [shopExtra,setShopExtra]=useState([]);
 
   const rate=(id,rating)=>setRecipes(p=>p.map(r=>r.id===id?{...r,rating:r.rating===rating?null:rating}:r));
-
   const addNote=(id,note)=>setRecipes(p=>p.map(r=>r.id===id?{...r,myNotes:[...(r.myNotes||[]),note]}:r));
+
+  const saveRecipe=updated=>{
+    setRecipes(p=>{
+      const idx=p.findIndex(r=>r.id===updated.id);
+      if(idx===-1) return [...p,{...updated,id:Date.now(),baseServ:updated.baseServ||2,myNotes:[]}];
+      return p.map(r=>r.id===updated.id?updated:r);
+    });
+  };
+  const deleteRecipe=id=>setRecipes(p=>p.filter(r=>r.id!==id));
 
   const addMissing=(missing,recipeName)=>{
     const newItems=missing.map((ing,i)=>({
@@ -2667,12 +2997,11 @@ function App(){
     }));
   };
 
-  const editPantryQty=(id,newQty)=>{ setPantry(prev=>prev.map(p=>p.id===id?{...p,qty:newQty}:p)); };
-  const addPantryItem=({n,cat})=>setPantry(prev=>[...prev,{id:Date.now(),n,cat,e:'📦',qty:1,max:5,low:1,unit:'шт'}]);
-  const removePantryItem=id=>setPantry(prev=>prev.filter(p=>p.id!==id));
+  const editPantryQty=(id,newQty)=>setPantry(prev=>prev.map(p=>p.id===id?{...p,qty:newQty}:p));
+  const addPantryItem=item=>setPantry(prev=>[...prev,item]);
+  const deletePantryItem=id=>setPantry(prev=>prev.filter(p=>p.id!==id));
 
   const currentRecipe=openRecipe?recipes.find(r=>r.id===openRecipe.id)||openRecipe:null;
-  const searched=useMemo(()=>{const q=globalQuery.trim().toLowerCase(); if(!q) return []; return recipes.filter(r=>r.name.toLowerCase().includes(q)||(r.tags||[]).join(' ').toLowerCase().includes(q)||(r.ings||[]).some(i=>i.n.toLowerCase().includes(q)));},[globalQuery,recipes]);
 
   return (
     <div>
@@ -2683,12 +3012,9 @@ function App(){
         <header className="hdr">
           <div className="hdr-in">
             <div className="logo">
-              <div className="logo-reel"/>
-              <span className="logo-tape">▓▒░</span>
-              <div className="logo-reel"/>
-              <span style={{margin:'0 8px'}}>🌿 <span>моя кухня</span></span>
+              🌸 моя кухня <span>· уютно · вкусно ·</span>
             </div>
-            <div style={{display:'flex',alignItems:'center',gap:8,flexWrap:'wrap'}}><input className="inp" style={{maxWidth:260}} placeholder="глобальный поиск..." value={globalQuery} onChange={e=>setGlobalQuery(e.target.value)}/>{globalQuery&&<span className="tag">{searched.length} найдено</span>}<button className="nb" onClick={exportData}>⬇️ Экспорт</button><button className="nb" onClick={()=>importInputRef.current&&importInputRef.current.click()}>⬆️ Импорт</button><input ref={importInputRef} type="file" accept="application/json" style={{display:'none'}} onChange={importData}/></div><nav className="nav">
+            <nav className="nav">
               {TABS.map(t=>(
                 <button key={t.k} className={`nb ${tab===t.k?'on':''}`} onClick={()=>setTab(t.k)}>
                   {t.i} {t.l}
@@ -2699,16 +3025,20 @@ function App(){
         </header>
         <main className="main">
           {tab==='home'      && <HomePage recipes={recipes} setTab={setTab} onOpen={r=>setOpenRecipe(r)}/>}
-          {tab==='recipes'   && <RecipesPage recipes={recipes} onOpen={r=>setOpenRecipe(r)} customCats={customCats} onUpdateCats={setCustomCats} onAddRecipe={r=>setRecipes(p=>[...p,r])}/>}
+          {tab==='recipes'   && <RecipesPage recipes={recipes} onOpen={r=>setOpenRecipe(r)}
+                                  onEdit={r=>setEditRecipe(r)} onDelete={deleteRecipe}
+                                  onAdd={()=>setEditRecipe({})}
+                                  customCats={customCats} onUpdateCats={setCustomCats}/>}
           {tab==='safe'      && <SafeFoodPage recipes={recipes} onOpen={r=>setOpenRecipe(r)}/>}
           {tab==='ratings'   && <RatingsPage recipes={recipes} onOpen={r=>setOpenRecipe(r)}/>}
           {tab==='plan'      && <PlanPage/>}
           {tab==='kbju'      && <KBJUPage/>}
-          {tab==='diary'     && <DiaryPage entriesState={diaryEntries} setEntriesState={setDiaryEntries}/>}
+          {tab==='diary'     && <DiaryPage/>}
           {tab==='shopping'  && <ShoppingPage extraItems={shopExtra}/>}
-          {tab==='pantry'    && <PantryPage pantry={pantry} onEditQty={editPantryQty} onAddItem={addPantryItem} onRemoveItem={removePantryItem}/>}
-          {tab==='wishlist'  && <WishlistPage wishes={wishlist} setWishes={setWishlist}/>}
-          {tab==='cassettes' && <CassettesPage channels={channels} onAddChannel={c=>setChannels(p=>[...p,c])} onRemoveChannel={id=>setChannels(p=>p.filter(c=>c.id!==id))}/>}
+          {tab==='pantry'    && <PantryPage pantry={pantry} onEditQty={editPantryQty}
+                                  onAddItem={addPantryItem} onDeleteItem={deletePantryItem}/>}
+          {tab==='wishlist'  && <WishlistPage/>}
+          {tab==='cassettes' && <CassettesPage/>}
         </main>
       </div>
 
@@ -2721,6 +3051,15 @@ function App(){
           pantry={pantry}
           onCook={cookRecipe}
           onAddNote={addNote}
+        />
+      )}
+
+      {editRecipe!==null&&(
+        <EditRecipeModal
+          recipe={editRecipe}
+          onClose={()=>setEditRecipe(null)}
+          onSave={saveRecipe}
+          onDelete={deleteRecipe}
         />
       )}
     </div>
