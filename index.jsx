@@ -1,4 +1,4 @@
-import { useState } from "react";
+const { useState } = React;
 
 const S = `
 @import url('https://fonts.googleapis.com/css2?family=Playfair+Display:ital,wght@0,400;0,600;0,700;1,400;1,600&family=Cormorant+Garamond:ital,wght@0,400;0,500;1,400;1,500&family=Dancing+Script:wght@400;600;700&family=Lora:ital,wght@0,400;0,500;1,400&display=swap');
@@ -2958,7 +2958,7 @@ const TABS=[
   {k:'cassettes',l:'Кассеты',  i:'📼'},
 ];
 
-export default function App(){
+function App(){
   const [tab,setTab]=useState('home');
   const [recipes,setRecipes]=useState(BASE_RECIPES);
   const [pantry,setPantry]=useState(INIT_PANTRY);
