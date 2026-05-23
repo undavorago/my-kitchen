@@ -1,4 +1,8 @@
-const { useState } = React;
+import React from 'react';
+import * as ReactDOM from 'react-dom/client';
+
+// src/core/styles.jsx
+const { useState, useEffect, useRef } = React;
 
 const S = `
 @import url('https://fonts.googleapis.com/css2?family=Playfair+Display:ital,wght@0,400;0,600;0,700;1,400;1,600&family=Cormorant+Garamond:ital,wght@0,400;0,500;1,400;1,500&family=Dancing+Script:wght@400;600;700&family=Lora:ital,wght@0,400;0,500;1,400&display=swap');
@@ -834,6 +838,8 @@ body{
 `
 
 
+
+// src/core/data.jsx
 // ─── DATA ──────────────────────────────────────────────────────────────
 
 const PALETTES=[
@@ -1237,6 +1243,8 @@ function getDayRu(){
 function getMonthRu(){return['Январь','Февраль','Март','Апрель','Май','Июнь','Июль','Август','Сентябрь','Октябрь','Ноябрь','Декабрь'][new Date().getMonth()];}
 function getTodayIdx(){const d=new Date().getDay();return d===0?6:d-1;}
 
+
+// src/components/shared.jsx
 // ─── PANTRY ITEM with qty bar ────────────────────────────────────────────
 
 function PantryItem({item, onEdit, onDelete}){
@@ -1751,9 +1759,48 @@ function RecipeCard({r,onClick,onEdit,onDelete}){
     </div>
   );
 }
+function GrainOverlay(){
+  return (
+    <svg style={{position:'fixed',inset:0,width:'100%',height:'100%',pointerEvents:'none',zIndex:9999,opacity:.032}}>
+      <filter id="grain">
+        <feTurbulence type="fractalNoise" baseFrequency="0.72" numOctaves="4" stitchTiles="stitch"/>
+      </filter>
+      <rect width="100%" height="100%" filter="url(#grain)"/>
+    </svg>
+  );
+}
 
-// ─── PAGES ───────────────────────────────────────────────────────────────
+function Stars(){
+  const pos=[
+    {t:'8%',l:'12%',s:'.8rem'},{t:'15%',l:'88%',s:'.6rem'},{t:'32%',l:'5%',s:'.5rem'},
+    {t:'45%',l:'96%',s:'.9rem'},{t:'68%',l:'8%',s:'.6rem'},{t:'75%',l:'92%',s:'.7rem'},
+    {t:'88%',l:'15%',s:'.5rem'},{t:'22%',l:'50%',s:'.45rem'},{t:'55%',l:'78%',s:'.55rem'},
+  ];
+  return (
+    <div style={{position:'fixed',inset:0,pointerEvents:'none',zIndex:1,overflow:'hidden'}}>
+      {pos.map((p,i)=>(
+        <span key={i} style={{position:'absolute',top:p.t,left:p.l,fontSize:p.s,
+          color:'rgba(200,160,48,.25)',userSelect:'none',lineHeight:1,
+          animation:`twinkle ${2+i*.4}s ease-in-out infinite alternate`}}>
+          {i%3===0?'✦':i%3===1?'✶':'·'}
+        </span>
+      ))}
+      <style>{`@keyframes twinkle{from{opacity:.15}to{opacity:.45}}`}</style>
+    </div>
+  );
+}
 
+function DecorLine(){
+  return (
+    <div style={{textAlign:'center',margin:'6px 0',fontFamily:"'Special Elite',cursive",
+      fontSize:'.68rem',color:'rgba(200,160,48,.4)',letterSpacing:'6px',userSelect:'none'}}>
+      ✦ · · · ✦ · · · ✦
+    </div>
+  );
+}
+
+
+// src/components/MoonWidget.jsx
 function MoonWidget(){
   const moon=getMoonPhase();
   const d=new Date();
@@ -1769,6 +1816,8 @@ function MoonWidget(){
   );
 }
 
+
+// src/pages/DiaryPage.jsx
 function DiaryDayRow({day, entries, target}){
   const total=entries.reduce((s,e)=>s+e.kcal,0);
   const pct=Math.min(total/target*100,100);
@@ -1804,9 +1853,8 @@ function DiaryQuickBtn({item, onAdd}){
   );
 }
 
-function DiaryPage(){
+function DiaryPage({entries, setEntries}){
   const [weekOffset,setWeekOffset]=useState(0);
-  const [entries,setEntries]=useState({});
   const [custom,setCustom]=useState('');
   const [customKcal,setCustomKcal]=useState('');
   const [showQuick,setShowQuick]=useState(true);
@@ -1926,55 +1974,17 @@ function DiaryPage(){
   );
 }
 
-function GrainOverlay(){
-  return (
-    <svg style={{position:'fixed',inset:0,width:'100%',height:'100%',pointerEvents:'none',zIndex:9999,opacity:.032}}>
-      <filter id="grain">
-        <feTurbulence type="fractalNoise" baseFrequency="0.72" numOctaves="4" stitchTiles="stitch"/>
-      </filter>
-      <rect width="100%" height="100%" filter="url(#grain)"/>
-    </svg>
-  );
-}
 
-function Stars(){
-  const pos=[
-    {t:'8%',l:'12%',s:'.8rem'},{t:'15%',l:'88%',s:'.6rem'},{t:'32%',l:'5%',s:'.5rem'},
-    {t:'45%',l:'96%',s:'.9rem'},{t:'68%',l:'8%',s:'.6rem'},{t:'75%',l:'92%',s:'.7rem'},
-    {t:'88%',l:'15%',s:'.5rem'},{t:'22%',l:'50%',s:'.45rem'},{t:'55%',l:'78%',s:'.55rem'},
-  ];
-  return (
-    <div style={{position:'fixed',inset:0,pointerEvents:'none',zIndex:1,overflow:'hidden'}}>
-      {pos.map((p,i)=>(
-        <span key={i} style={{position:'absolute',top:p.t,left:p.l,fontSize:p.s,
-          color:'rgba(200,160,48,.25)',userSelect:'none',lineHeight:1,
-          animation:`twinkle ${2+i*.4}s ease-in-out infinite alternate`}}>
-          {i%3===0?'✦':i%3===1?'✶':'·'}
-        </span>
-      ))}
-      <style>{`@keyframes twinkle{from{opacity:.15}to{opacity:.45}}`}</style>
-    </div>
-  );
-}
-
-function DecorLine(){
-  return (
-    <div style={{textAlign:'center',margin:'6px 0',fontFamily:"'Special Elite',cursive",
-      fontSize:'.68rem',color:'rgba(200,160,48,.4)',letterSpacing:'6px',userSelect:'none'}}>
-      ✦ · · · ✦ · · · ✦
-    </div>
-  );
-}
-
-function HomePage({recipes, setTab, onOpen}){
+// src/pages/HomePage.jsx
+function HomePage({recipes, pantry, channels, setTab, onOpen}){
   const dp=PLAN[getTodayIdx()]||{};
   const loved=recipes.filter(r=>r.rating==='love');
   const stats=[
     {i:'📖',v:recipes.length,    l:'рецептов',     hint:'открыть рецепты', tab:'recipes'},
     {i:'🔥',v:loved.length,      l:'обожаемых',    hint:'смотреть оценки', tab:'ratings'},
     {i:'🫧',v:recipes.filter(r=>r.safefood).length,l:'safe food',hint:'открыть safe food',tab:'safe'},
-    {i:'🗄️',v:INIT_PANTRY.length,l:'в полочке',    hint:'смотреть полочки',tab:'pantry'},
-    {i:'📼',v:CHANNELS.length,   l:'каналов',      hint:'смотреть кассеты',tab:'cassettes'},
+    {i:'🗄️',v:pantry.length,     l:'в полочке',    hint:'смотреть полочки',tab:'pantry'},
+    {i:'📼',v:channels.length,   l:'каналов',      hint:'смотреть кассеты',tab:'cassettes'},
   ];
   return (
     <div>
@@ -2058,6 +2068,8 @@ function HomePage({recipes, setTab, onOpen}){
   );
 }
 
+
+// src/pages/RecipesPage.jsx
 function Highlight({text, query}){
   if(!query) return <span>{text}</span>;
   const idx=text.toLowerCase().indexOf(query.toLowerCase());
@@ -2310,6 +2322,8 @@ function RecipesPage({recipes, onOpen, onEdit, onDelete, onAdd, customCats, onUp
   );
 }
 
+
+// src/pages/RatingsPage.jsx
 function RatingsPage({recipes,onOpen}){
   const loved=recipes.filter(r=>r.rating==='love');
   const groups=Object.entries(RATINGS).map(([key,val])=>({key,...val,items:recipes.filter(r=>r.rating===key)}));
@@ -2369,6 +2383,8 @@ function RatingsPage({recipes,onOpen}){
   );
 }
 
+
+// src/pages/SafeFoodPage.jsx
 function SafeFoodPage({recipes,onOpen}){
   const safe=recipes.filter(r=>r.safefood);
   return (
@@ -2403,6 +2419,8 @@ function SafeFoodPage({recipes,onOpen}){
   );
 }
 
+
+// src/pages/KBJUPage.jsx
 function KBJUDayBar({d, isToday}){
   const pctB=Math.min((d.b/KBJU_TARGET.b)*100,100);
   const pctF=Math.min((d.f/KBJU_TARGET.f)*100,100);
@@ -2491,6 +2509,8 @@ function KBJUPage(){
   );
 }
 
+
+// src/pages/PlanPage.jsx
 function PlanPage(){
   const ti=getTodayIdx();
   const rows=['Завтрак','Обед','Ужин'];
@@ -2532,12 +2552,12 @@ function PlanPage(){
 
 const SHOP_CATS=['🥬 Овощи и фрукты','🌾 Крупы','🥛 Молочное','🥩 Мясо и рыба','🫖 Напитки','🧹 Бытовое','🐱 Для Эльзы','📦 Другое'];
 
-function ShoppingPage({extraItems}){
-  const [items,setItems]=useState(INIT_SHOP);
+
+// src/pages/ShoppingPage.jsx
+function ShoppingPage({items, setItems}){
   const [nw,setNw]=useState('');
   const [newCat,setNewCat]=useState('🥬 Овощи и фрукты');
   const [showHousehold,setShowHousehold]=useState(false);
-  useState(()=>{if(extraItems?.length){setItems(p=>{const ex=new Set(p.map(i=>i.name.toLowerCase()));const ns=extraItems.filter(e=>!ex.has(e.name.toLowerCase()));return[...p,...ns];});}},[extraItems]);
   const budget=3000;
   const total=items.reduce((s,i)=>s+i.price,0);
   const spent=items.filter(i=>i.done).reduce((s,i)=>s+i.price,0);
@@ -2648,6 +2668,8 @@ function ShoppingPage({extraItems}){
   );
 }
 
+
+// src/pages/PantryPage.jsx
 function PantryPage({pantry, onEditQty, onAddItem, onDeleteItem}){
   const cats=[...new Set(pantry.map(p=>p.cat))];
   const low=pantry.filter(p=>p.qty<=p.low&&p.qty>0);
@@ -2742,8 +2764,9 @@ function PantryPage({pantry, onEditQty, onAddItem, onDeleteItem}){
   );
 }
 
-function WishlistPage(){
-  const [wishes,setWishes]=useState(WISHES_DATA);
+
+// src/pages/WishlistPage.jsx
+function WishlistPage({wishes, setWishes}){
   const [nw,setNw]=useState('');
   const [editingId,setEditingId]=useState(null);
   const [editVal,setEditVal]=useState('');
@@ -2799,6 +2822,8 @@ function WishlistPage(){
   );
 }
 
+
+// src/pages/CassettesPage.jsx
 function CassetteCard({ch, onEdit, onDelete}){
   const [body,label,labelTxt,notch,win]=PALETTES[ch.pi];
   return (
@@ -2901,8 +2926,7 @@ function EditCassetteModal({ch, onClose, onSave}){
   );
 }
 
-function CassettesPage(){
-  const [channels,setChannels]=useState(CHANNELS);
+function CassettesPage({channels, setChannels}){
   const [filter,setFilter]=useState('Все');
   const [editCh,setEditCh]=useState(null);   // null | {} для новой | объект для редакт.
   const [showEdit,setShowEdit]=useState(false);
@@ -2942,6 +2966,8 @@ function CassettesPage(){
   );
 }
 
+
+// src/App.jsx
 // ─── APP ─────────────────────────────────────────────────────────────────
 
 const TABS=[
@@ -2958,14 +2984,115 @@ const TABS=[
   {k:'cassettes',l:'Кассеты',  i:'📼'},
 ];
 
+const COLLECTION_DEFAULTS={
+  recipes:()=>BASE_RECIPES,
+  pantry:()=>INIT_PANTRY,
+  customCategories:()=>INIT_CUSTOM_CATS,
+  shopping:()=>INIT_SHOP,
+  wishes:()=>WISHES_DATA,
+  channels:()=>CHANNELS,
+  diary:()=>({}),
+};
+
+const isEmptyCollection=(name,value)=>{
+  if(name==='diary') return !value||Object.keys(value).length===0;
+  return !Array.isArray(value)||value.length===0;
+};
+
+const normalizeCollection=(name,value,useDefaults)=>{
+  if(name==='diary') return value&&typeof value==='object'&&!Array.isArray(value)?value:{};
+  if(Array.isArray(value)) return value;
+  return useDefaults?COLLECTION_DEFAULTS[name]():[];
+};
+
 function App(){
   const [tab,setTab]=useState('home');
   const [recipes,setRecipes]=useState(BASE_RECIPES);
   const [pantry,setPantry]=useState(INIT_PANTRY);
   const [customCats,setCustomCats]=useState(INIT_CUSTOM_CATS);
+  const [shoppingItems,setShoppingItems]=useState(INIT_SHOP);
+  const [wishes,setWishes]=useState(WISHES_DATA);
+  const [channels,setChannels]=useState(CHANNELS);
+  const [diaryEntries,setDiaryEntries]=useState({});
   const [openRecipe,setOpenRecipe]=useState(null);
   const [editRecipe,setEditRecipe]=useState(null);  // null | {} новый | объект для редакт.
-  const [shopExtra,setShopExtra]=useState([]);
+  const [loading,setLoading]=useState(true);
+  const [saveStatus,setSaveStatus]=useState('загрузка...');
+  const hydrated=useRef(false);
+  const saveTimers=useRef({});
+
+  const replaceCollection=(name,payload)=>fetch(`/api/${name}`,{
+    method:'PUT',
+    headers:{'Content-Type':'application/json'},
+    body:JSON.stringify(payload),
+  }).then(res=>{
+    if(!res.ok) throw new Error(`Failed to save ${name}`);
+    return res.json();
+  });
+
+  const queueSave=(name,payload)=>{
+    if(!hydrated.current) return;
+    clearTimeout(saveTimers.current[name]);
+    setSaveStatus('сохранение...');
+    saveTimers.current[name]=setTimeout(()=>{
+      replaceCollection(name,payload)
+        .then(()=>setSaveStatus('сохранено'))
+        .catch(()=>setSaveStatus('ошибка сохранения'));
+    },400);
+  };
+
+  useEffect(()=>{
+    let cancelled=false;
+    fetch('/api/bootstrap')
+      .then(res=>{
+        if(!res.ok) throw new Error('Failed to load data');
+        return res.json();
+      })
+      .then(data=>{
+        if(cancelled) return;
+        const names=Object.keys(COLLECTION_DEFAULTS);
+        const firstRun=names.every(name=>isEmptyCollection(name,data?.[name]));
+        const next=Object.fromEntries(names.map(name=>[
+          name,
+          firstRun?COLLECTION_DEFAULTS[name]():normalizeCollection(name,data?.[name],false),
+        ]));
+
+        setRecipes(next.recipes);
+        setPantry(next.pantry);
+        setCustomCats(next.customCategories);
+        setShoppingItems(next.shopping);
+        setWishes(next.wishes);
+        setChannels(next.channels);
+        setDiaryEntries(next.diary);
+        hydrated.current=true;
+        setLoading(false);
+        setSaveStatus(firstRun?'сохранение...':'сохранено');
+
+        if(firstRun){
+          Promise.all(names.map(name=>replaceCollection(name,next[name])))
+            .then(()=>!cancelled&&setSaveStatus('сохранено'))
+            .catch(()=>!cancelled&&setSaveStatus('ошибка сохранения'));
+        }
+      })
+      .catch(()=>{
+        if(cancelled) return;
+        hydrated.current=true;
+        setLoading(false);
+        setSaveStatus('нет связи с API');
+      });
+    return ()=>{
+      cancelled=true;
+      Object.values(saveTimers.current).forEach(clearTimeout);
+    };
+  },[]);
+
+  useEffect(()=>queueSave('recipes',recipes),[recipes]);
+  useEffect(()=>queueSave('pantry',pantry),[pantry]);
+  useEffect(()=>queueSave('customCategories',customCats),[customCats]);
+  useEffect(()=>queueSave('shopping',shoppingItems),[shoppingItems]);
+  useEffect(()=>queueSave('wishes',wishes),[wishes]);
+  useEffect(()=>queueSave('channels',channels),[channels]);
+  useEffect(()=>queueSave('diary',diaryEntries),[diaryEntries]);
 
   const rate=(id,rating)=>setRecipes(p=>p.map(r=>r.id===id?{...r,rating:r.rating===rating?null:rating}:r));
   const addNote=(id,note)=>setRecipes(p=>p.map(r=>r.id===id?{...r,myNotes:[...(r.myNotes||[]),note]}:r));
@@ -2983,7 +3110,10 @@ function App(){
     const newItems=missing.map((ing,i)=>({
       id:Date.now()+i,name:ing.n,amount:`для: ${recipeName}`,price:0,cat:'Из рецепта',done:false
     }));
-    setShopExtra(p=>[...p,...newItems]);
+    setShoppingItems(p=>{
+      const existing=new Set(p.map(i=>i.name.toLowerCase()));
+      return [...p,...newItems.filter(i=>!existing.has(i.name.toLowerCase()))];
+    });
     setTab('shopping');
   };
 
@@ -3014,6 +3144,7 @@ function App(){
             <div className="logo">
               🌸 моя кухня <span>· уютно · вкусно ·</span>
             </div>
+            <span className="tag" style={{whiteSpace:'nowrap'}}>{saveStatus}</span>
             <nav className="nav">
               {TABS.map(t=>(
                 <button key={t.k} className={`nb ${tab===t.k?'on':''}`} onClick={()=>setTab(t.k)}>
@@ -3024,21 +3155,26 @@ function App(){
           </div>
         </header>
         <main className="main">
-          {tab==='home'      && <HomePage recipes={recipes} setTab={setTab} onOpen={r=>setOpenRecipe(r)}/>}
-          {tab==='recipes'   && <RecipesPage recipes={recipes} onOpen={r=>setOpenRecipe(r)}
+          {loading&&(
+            <div style={{fontFamily:"'Playfair Display',serif",fontSize:'1.2rem',color:'var(--brown)',fontStyle:'italic'}}>
+              Загружаю кухню...
+            </div>
+          )}
+          {!loading&&tab==='home'      && <HomePage recipes={recipes} pantry={pantry} channels={channels} setTab={setTab} onOpen={r=>setOpenRecipe(r)}/>}
+          {!loading&&tab==='recipes'   && <RecipesPage recipes={recipes} onOpen={r=>setOpenRecipe(r)}
                                   onEdit={r=>setEditRecipe(r)} onDelete={deleteRecipe}
                                   onAdd={()=>setEditRecipe({})}
                                   customCats={customCats} onUpdateCats={setCustomCats}/>}
-          {tab==='safe'      && <SafeFoodPage recipes={recipes} onOpen={r=>setOpenRecipe(r)}/>}
-          {tab==='ratings'   && <RatingsPage recipes={recipes} onOpen={r=>setOpenRecipe(r)}/>}
-          {tab==='plan'      && <PlanPage/>}
-          {tab==='kbju'      && <KBJUPage/>}
-          {tab==='diary'     && <DiaryPage/>}
-          {tab==='shopping'  && <ShoppingPage extraItems={shopExtra}/>}
-          {tab==='pantry'    && <PantryPage pantry={pantry} onEditQty={editPantryQty}
+          {!loading&&tab==='safe'      && <SafeFoodPage recipes={recipes} onOpen={r=>setOpenRecipe(r)}/>}
+          {!loading&&tab==='ratings'   && <RatingsPage recipes={recipes} onOpen={r=>setOpenRecipe(r)}/>}
+          {!loading&&tab==='plan'      && <PlanPage/>}
+          {!loading&&tab==='kbju'      && <KBJUPage/>}
+          {!loading&&tab==='diary'     && <DiaryPage entries={diaryEntries} setEntries={setDiaryEntries}/>}
+          {!loading&&tab==='shopping'  && <ShoppingPage items={shoppingItems} setItems={setShoppingItems}/>}
+          {!loading&&tab==='pantry'    && <PantryPage pantry={pantry} onEditQty={editPantryQty}
                                   onAddItem={addPantryItem} onDeleteItem={deletePantryItem}/>}
-          {tab==='wishlist'  && <WishlistPage/>}
-          {tab==='cassettes' && <CassettesPage/>}
+          {!loading&&tab==='wishlist'  && <WishlistPage wishes={wishes} setWishes={setWishes}/>}
+          {!loading&&tab==='cassettes' && <CassettesPage channels={channels} setChannels={setChannels}/>}
         </main>
       </div>
 
@@ -3067,3 +3203,4 @@ function App(){
 }
 
 ReactDOM.createRoot(document.getElementById('root')).render(React.createElement(App));
+
